@@ -9,6 +9,10 @@ use rustcode::utils::log_out;
 extern "C" {
     fn alert(s: &str);
 }
+#[wasm_bindgen]
+pub fn event_listener(event_code: &str) {
+    console::log_1(&JsValue::from_str(event_code));
+}
 
 #[wasm_bindgen]
 pub fn render_game(ctx: &CanvasRenderingContext2d) {

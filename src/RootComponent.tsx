@@ -1,10 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { render_game } from '../pkg/react_wasm_01';
+import useAddEventListeners from './hooks/useEventListeners';
 
 export default function RootComponent() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animationFrameId = useRef<number | null>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
+
+  useAddEventListeners()
 
   useEffect(() => {
     const canvas = canvasRef.current;
