@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { render_game } from '../pkg/react_wasm_01';
+import { game_init, render_game } from '../pkg/react_wasm_01';
+import init from '../pkg/react_wasm_01'
 import useAddEventListeners from './hooks/useEventListeners';
 
-export default function RootComponent() {
+export default function Game() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animationFrameId = useRef<number | null>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
@@ -10,25 +11,31 @@ export default function RootComponent() {
   useAddEventListeners()
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    async function startGame() {
+      await init();
+      game_init()
 
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+      const canvas = canvasRef.current;
+      if (!canvas) return;
 
-    ctxRef.current = ctx;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
 
-    canvas.width = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
-    ctx.imageSmoothingEnabled = false;
+      ctxRef.current = ctx;
 
-    function gameLoop() {
-      if (!ctx || !canvas) return;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      render_game(ctx)
-      animationFrameId.current = requestAnimationFrame(gameLoop);
-    };
-    gameLoop()
+      canvas.width = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+      ctx.imageSmoothingEnabled = false;
+
+      function gameLoop() {
+        if (!ctx || !canvas) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        render_game(ctx)
+        animationFrameId.current = requestAnimationFrame(gameLoop);
+      };
+      gameLoop()
+    }
+    startGame()
     return () => {
       if (animationFrameId.current) {
         cancelAnimationFrame(animationFrameId.current);
