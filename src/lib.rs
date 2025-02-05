@@ -1,8 +1,6 @@
 mod utils;
 mod rustcode;
-
-use std::sync::Mutex;
-
+use std::{collections::HashMap, sync::Mutex};
 use web_sys::{console, CanvasRenderingContext2d};
 use lazy_static::lazy_static;
 use wasm_bindgen::prelude::*;
@@ -16,7 +14,7 @@ extern "C" {
 pub fn event_listener(event_code: &str) {
     console::log_1(&JsValue::from_str(event_code));
 }
-
+#[derive(Eq, PartialEq, Hash, Clone)]
 struct CoordTile {
     x: u64,
     y: u64
@@ -29,29 +27,44 @@ struct CoordAbs {
 struct Tile {
     coord_tile: CoordTile,
     coord_abs: CoordAbs,
-    player: bool,
-    tail: bool
+    role: Role
 }
 impl Tile {
-   fn get_size() -> f64 {
-        40.
-   } 
+   fn get_size() -> f64 { 40. } 
+}
+enum Role {
+    Player,
+    Tail,
+    Board,
+}
+
+struct Game {
+    tiles: Vec<Tile>,
+    tiles_map: HashMap<CoordTile,Tile>
+}
+impl Game {
+    fn new() -> Self {
+        Self {
+            tiles: vec![],
+            tiles_map: HashMap::new()
+        }
+    }
+    
 }
 
 lazy_static! {
-    static ref TILES: Mutex<Vec<Tile>> = Mutex::new(vec![]);
+    static ref GAME: Mutex<Game> = Mutex::new(Game::new());
 }
 
 #[wasm_bindgen]
 pub fn game_init() {
-    let mut tiles = TILES.lock().unwrap();
+    let tiles_map = &mut GAME.lock().unwrap().tiles_map;
     let mut x = 0;
     let mut y = 0;
     while y < 600 {
         while x < 800 {
             let tile = Tile {
-                player: false,
-                tail: false,
+                role: Role::Board, 
                 coord_tile: CoordTile {
                     x: x / Tile::get_size() as u64,
                     y: y / Tile::get_size() as u64
@@ -61,7 +74,10 @@ pub fn game_init() {
                     y: y as f64 
                 }
             };
-            tiles.push(tile);
+            tiles_map.insert(
+                tile.coord_tile.clone(), 
+                tile
+            );
             x += Tile::get_size() as u64;
         }
         x = 0;
@@ -71,19 +87,20 @@ pub fn game_init() {
 
 #[wasm_bindgen]
 pub fn render_game(ctx: &CanvasRenderingContext2d) {
-    let tiles = TILES.lock().unwrap();
-    ctx.set_fill_style_str("gray");
+    let tiles_map = &GAME.lock().unwrap().tiles_map;
 
-    tiles.iter().for_each(|tile| {
-        if !tile.player && tile.tail {
-            ctx.set_fill_style_str("gray");
+    for (_, tile) in tiles_map.iter() {
+        match tile.role {
+            Role::Board =>  { ctx.set_fill_style_str("black") }
+            _ => todo!()
         }
-        //console::log_1(&JsValue::from_str(&format!("{:?}",tile.coord_abs)));
         ctx.fill_rect(
             tile.coord_abs.x, 
             tile.coord_abs.y, 
             Tile::get_size(), 
             Tile::get_size()
         );
-    });
+    };
 }
+
+
