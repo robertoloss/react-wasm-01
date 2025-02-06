@@ -37,16 +37,29 @@ enum Role {
     Tail,
     Board,
 }
+struct Player {
+    curr_pos: CoordTile
+}
+impl Player {
+    fn new() -> Self {
+        Self {
+            curr_pos: CoordTile {
+                x: 0,
+                y: 0
+            }
+        }
+    }
+}
 
 struct Game {
-    tiles: Vec<Tile>,
-    tiles_map: HashMap<CoordTile,Tile>
+    tiles_map: HashMap<CoordTile,Tile>,
+    player: Player
 }
 impl Game {
     fn new() -> Self {
         Self {
-            tiles: vec![],
-            tiles_map: HashMap::new()
+            tiles_map: HashMap::new(),
+            player: Player::new(),
         }
     }
     
@@ -55,10 +68,7 @@ impl Game {
 lazy_static! {
     static ref GAME: Mutex<Game> = Mutex::new(Game::new());
 }
-
-#[wasm_bindgen]
-pub fn game_init() {
-    let tiles_map = &mut GAME.lock().unwrap().tiles_map;
+fn create_tiles_map(tiles_map: &mut HashMap<CoordTile,Tile>) {
     let mut x = 0;
     let mut y = 0;
     while y < 600 {
@@ -86,12 +96,22 @@ pub fn game_init() {
 }
 
 #[wasm_bindgen]
+pub fn game_init() {
+    let mut game = GAME.lock().unwrap();
+    create_tiles_map(&mut game.tiles_map);
+
+    let player_position = game.player.curr_pos.clone();
+    game.tiles_map.get_mut(&player_position).unwrap_throw().role = Role::Player;
+}
+
+#[wasm_bindgen]
 pub fn render_game(ctx: &CanvasRenderingContext2d) {
     let tiles_map = &GAME.lock().unwrap().tiles_map;
 
     for (_, tile) in tiles_map.iter() {
         match tile.role {
             Role::Board =>  { ctx.set_fill_style_str("black") }
+            Role::Player =>  { ctx.set_fill_style_str("white") }
             _ => todo!()
         }
         ctx.fill_rect(
