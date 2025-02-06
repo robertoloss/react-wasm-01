@@ -13,6 +13,23 @@ extern "C" {
 #[wasm_bindgen]
 pub fn event_listener(event_code: &str) {
     console::log_1(&JsValue::from_str(event_code));
+    let player = &mut PLAYER.lock().unwrap();
+
+    match event_code {
+        "ArrowDown" => { 
+            player.curr_pos.y += 1; 
+        }
+        "ArrowUp" => { 
+            player.curr_pos.y -= 1; 
+        }
+        "ArrowLeft" => { 
+            player.curr_pos.x -= 1; 
+        }
+        "ArrowRight" => { 
+            player.curr_pos.x += 1; 
+        }
+        _ => { todo!() }
+    }
 }
 #[derive(Eq, PartialEq, Hash, Clone)]
 struct CoordTile {
@@ -30,7 +47,7 @@ struct Tile {
     role: Role
 }
 impl Tile {
-   fn get_size() -> f64 { 40. } 
+   fn get_size() -> f64 { 10. } 
 }
 enum Role {
     Player,
@@ -112,7 +129,7 @@ pub fn render_game(ctx: &CanvasRenderingContext2d) {
     for (_, tile) in tiles_map.iter() {
         match tile.role {
             Role::Board =>  { ctx.set_fill_style_str("black") }
-            Role::Player =>  { ctx.set_fill_style_str("white") }
+            Role::Player =>  { ctx.set_fill_style_str("transparent") }
             _ => todo!()
         }
         ctx.fill_rect(
