@@ -67,6 +67,8 @@ impl Game {
 
 lazy_static! {
     static ref GAME: Mutex<Game> = Mutex::new(Game::new());
+    static ref PLAYER: Mutex<Player> = Mutex::new(Player::new());
+    static ref TILES_MAP: Mutex<HashMap<CoordTile,Tile>> = Mutex::new(HashMap::new());
 }
 fn create_tiles_map(tiles_map: &mut HashMap<CoordTile,Tile>) {
     let mut x = 0;
@@ -97,16 +99,15 @@ fn create_tiles_map(tiles_map: &mut HashMap<CoordTile,Tile>) {
 
 #[wasm_bindgen]
 pub fn game_init() {
-    let mut game = GAME.lock().unwrap();
-    create_tiles_map(&mut game.tiles_map);
-
-    let player_position = game.player.curr_pos.clone();
-    game.tiles_map.get_mut(&player_position).unwrap_throw().role = Role::Player;
+    let tiles_map = &mut TILES_MAP.lock().unwrap();
+    create_tiles_map(tiles_map);
 }
 
 #[wasm_bindgen]
 pub fn render_game(ctx: &CanvasRenderingContext2d) {
-    let tiles_map = &GAME.lock().unwrap().tiles_map;
+    let tiles_map = &mut TILES_MAP.lock().unwrap();
+    let player = PLAYER.lock().unwrap();
+    tiles_map.get_mut(&player.curr_pos).unwrap_throw().role = Role::Player;
 
     for (_, tile) in tiles_map.iter() {
         match tile.role {
