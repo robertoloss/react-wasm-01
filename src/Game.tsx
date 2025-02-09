@@ -47,7 +47,11 @@ export default function Game() {
   return (
     <div className='flex flex-col h-screen w-screen bg-zinc-700 items-center justify-center text-white'>
       <div className='flex relative w-full h-full flex-col max-w-[800px] max-h-[600px] bg-blue-800'>
-        <div className='flex absolute top-0 left-0 w-full h-full bg-orange-100'/>
+        {false && <div className='flex absolute top-0 left-0 w-full h-full bg-orange-100'/> }
+        {true && <img 
+          src='https://www.visittrentino.info/assets-database/32000-32999/32300-32399/983401/image-thumb__983401__contentgallery/san-martino-di-castrozza---vanoi---lago-di-calaita_32346@2x.webp'
+          className='flex absolute top-0 left-0 w-full h-full'
+        /> }
         <canvas
           ref={canvasRef}
           className='flex absolute top-0 left-0 w-full h-full'

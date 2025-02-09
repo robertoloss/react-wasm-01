@@ -1,6 +1,8 @@
 mod utils;
+extern crate console_error_panic_hook;
+use std::panic;
 mod rustcode;
-use std::{collections::HashMap, convert::TryInto, sync::{Arc, Mutex}};
+use std::{collections::HashMap, sync::{Arc, Mutex}};
 use rustcode::utils::log_out;
 use web_sys::{console, CanvasRenderingContext2d};
 use lazy_static::lazy_static;
@@ -93,6 +95,7 @@ enum Role {
     Player,
     Tail,
     Board,
+    Claimed
 }
 #[derive(PartialEq)]
 pub enum Move {
@@ -103,6 +106,7 @@ pub enum Move {
     Still
 }
 pub struct Player {
+    pub init_pos: CoordTile,
     pub curr_pos: CoordTile,
     pub prev_pos: CoordTile,
     pub movement: Move,
@@ -110,15 +114,14 @@ pub struct Player {
 }
 impl Player {
     fn new() -> Self {
+        let init_pos = CoordTile {
+            x: 0,
+            y: 0
+        };
         Self {
-            curr_pos: CoordTile {
-                x: 0,
-                y: 0
-            },
-            prev_pos: CoordTile {
-                x: 0,
-                y: 0
-            },
+            init_pos: init_pos.clone(),
+            curr_pos: init_pos.clone(),
+            prev_pos: init_pos.clone(),
             movement: Move::Still,
             tail: vec![]
         }
@@ -192,6 +195,7 @@ fn create_tiles_map(tiles_map: &mut HashMap<CoordTile,Arc<Mutex<Tile>>>) {
 
 #[wasm_bindgen]
 pub fn game_init() {
+    panic::set_hook(Box::new(console_error_panic_hook::hook));
     let tiles_map = &mut TILES_MAP.lock().unwrap();
     create_tiles_map(tiles_map);
 }
@@ -210,20 +214,32 @@ pub fn erase_tail(
 ) {
     let curr_tile = tiles_map
         .get(&player.curr_pos)
-        .unwrap_throw()
+        .expect("function erase_tail panicked")
         .lock()
         .unwrap();
-    log_out(&format!("{:?}",curr_tile.role));
-    if tile_is_border(&curr_tile, game) {
-        log_out("taile len > 0");
+
+    //log_out(&format!("{:?}",curr_tile.role));
+    let is_border = tile_is_border(&curr_tile, game);
+    drop(curr_tile);
+
+    if is_border {
+        if player.tail.len() == 0 { return }
         player
             .tail
             .iter()
             .for_each(|mutex_tile| {
                 let mut tile = mutex_tile.lock().unwrap();
-                tile.role = Role::Board;
+                tile.role = Role::Claimed;
             });
+        player.tail = vec![];
     }
+}
+
+pub fn collect_tiles_to_claim() {
+    todo!()
+}
+pub fn claim_tiles() {
+    todo!()
 }
 
 #[wasm_bindgen]
@@ -242,7 +258,7 @@ pub fn render_game(ctx: &CanvasRenderingContext2d) {
         if player.curr_pos != player.prev_pos {
             let tile = tiles_map
                 .get(&player.prev_pos)
-                .unwrap_throw();
+                .expect("render_game panicked");
             let mut locked_tile = tile.lock().unwrap();
             locked_tile.role = Role::Tail;
             player.tail.push(Arc::clone(tile));
@@ -264,6 +280,7 @@ pub fn render_game(ctx: &CanvasRenderingContext2d) {
                 Role::Board =>  { ctx.set_fill_style_str("black") }
                 Role::Player =>  { ctx.set_fill_style_str("yellow") }
                 Role::Tail => { ctx.set_fill_style_str("orange") }
+                Role::Claimed => { ctx.set_fill_style_str("transparent") }
             }
         } else {
             if let Role::Player = tile_locked.role {
