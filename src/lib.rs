@@ -1,6 +1,7 @@
 mod utils;
 mod rustcode;
-use std::{collections::HashMap, sync::Mutex};
+use std::{collections::HashMap, convert::TryInto, sync::{Arc, Mutex}};
+use rustcode::utils::log_out;
 use web_sys::{console, CanvasRenderingContext2d};
 use lazy_static::lazy_static;
 use wasm_bindgen::prelude::*;
@@ -28,7 +29,7 @@ pub fn event_listener(event_code: &str) {
         "ArrowRight" => { 
             player.movement = Move::Right
         }
-        _ => { todo!() }
+        _ => { println!("hey") }
     }
 }
 
@@ -63,7 +64,7 @@ pub fn move_player(player: &mut Player, game: &Game) {
 }
 
 #[derive(Eq, PartialEq, Hash, Clone, Debug)]
-struct CoordTile {
+pub struct CoordTile {
     x: u64,
     y: u64
 }
@@ -78,7 +79,7 @@ struct CoordAbs {
     x: f64,
     y: f64
 }
-struct Tile {
+pub struct Tile {
     coord_tile: CoordTile,
     coord_abs: CoordAbs,
     role: Role,
@@ -87,13 +88,14 @@ struct Tile {
 impl Tile {
    fn get_size() -> f64 { 10. } 
 }
+#[derive(Debug)]
 enum Role {
     Player,
     Tail,
     Board,
 }
 #[derive(PartialEq)]
-enum Move {
+pub enum Move {
     Up,
     Down,
     Left,
@@ -103,7 +105,8 @@ enum Move {
 pub struct Player {
     pub curr_pos: CoordTile,
     pub prev_pos: CoordTile,
-    pub movement: Move
+    pub movement: Move,
+    pub tail: Vec<Arc<Mutex<Tile>>>,
 }
 impl Player {
     fn new() -> Self {
@@ -116,12 +119,13 @@ impl Player {
                 x: 0,
                 y: 0
             },
-            movement: Move::Still
+            movement: Move::Still,
+            tail: vec![]
         }
     }
 }
 
-struct Game {
+pub struct Game {
     tile_dim: CoordTile,
     abs_dim: CoordAbs
 }
@@ -140,12 +144,12 @@ impl Game {
 lazy_static! {
     static ref GAME: Mutex<Game> = Mutex::new(Game::new(CoordTile{ x: 80, y: 60}));
     static ref PLAYER: Mutex<Player> = Mutex::new(Player::new());
-    static ref TILES_MAP: Mutex<HashMap<CoordTile,Tile>> = Mutex::new(HashMap::new());
+    static ref TILES_MAP: Mutex<HashMap<CoordTile,Arc<Mutex<Tile>>>> = Mutex::new(HashMap::new());
     static ref COUNTER: Mutex<u64> = Mutex::new(0);
 }
 
 
-fn create_tiles_map(tiles_map: &mut HashMap<CoordTile,Tile>) {
+fn create_tiles_map(tiles_map: &mut HashMap<CoordTile,Arc<Mutex<Tile>>>) {
     let game = GAME.lock().unwrap();
     let mut x = 0;
     let mut y = 0;
@@ -172,9 +176,12 @@ fn create_tiles_map(tiles_map: &mut HashMap<CoordTile,Tile>) {
                     y: y as f64 
                 }
             };
+            let tile_coord = tile.coord_tile.clone(); 
+            let mutex_tile = Mutex::new(tile);
+            let arc_tile = Arc::new(mutex_tile);
             tiles_map.insert(
-                tile.coord_tile.clone(), 
-                tile
+                tile_coord, 
+                arc_tile
             );
             x += Tile::get_size() as u64;
         }
@@ -189,6 +196,36 @@ pub fn game_init() {
     create_tiles_map(tiles_map);
 }
 
+pub fn tile_is_border(tile: &Tile, game: &Game) -> bool {
+    tile.coord_tile.x == 0 ||
+    tile.coord_tile.y == 0 ||
+    tile.coord_tile.x == game.tile_dim.x - 1 ||
+    tile.coord_tile.y == game.tile_dim.y - 1
+}
+
+pub fn erase_tail(
+    player: &mut Player, 
+    tiles_map: &mut HashMap<CoordTile,Arc<Mutex<Tile>>>,
+    game: &Game
+) {
+    let curr_tile = tiles_map
+        .get(&player.curr_pos)
+        .unwrap_throw()
+        .lock()
+        .unwrap();
+    log_out(&format!("{:?}",curr_tile.role));
+    if tile_is_border(&curr_tile, game) {
+        log_out("taile len > 0");
+        player
+            .tail
+            .iter()
+            .for_each(|mutex_tile| {
+                let mut tile = mutex_tile.lock().unwrap();
+                tile.role = Role::Board;
+            });
+    }
+}
+
 #[wasm_bindgen]
 pub fn render_game(ctx: &CanvasRenderingContext2d) {
     let tiles_map = &mut TILES_MAP.lock().unwrap();
@@ -196,42 +233,48 @@ pub fn render_game(ctx: &CanvasRenderingContext2d) {
     let game = &mut GAME.lock().unwrap();
     let mut counter = COUNTER.lock().unwrap();
 
+    if player.tail.len() > 0 {
+        erase_tail(player, tiles_map, game);
+    }
 
-    if *counter > 2 {
+    if *counter > 3 {
         move_player(player, game);
-        //console::log_1(&JsValue::from_str(&format!("{}",player.prev_pos)));
-        //console::log_1(&JsValue::from_str(&format!("{}",player.curr_pos)));
         if player.curr_pos != player.prev_pos {
-            tiles_map
-                .get_mut(&player.prev_pos)
-                .unwrap_throw()
-                .role = Role::Tail;
+            let tile = tiles_map
+                .get(&player.prev_pos)
+                .unwrap_throw();
+            let mut locked_tile = tile.lock().unwrap();
+            locked_tile.role = Role::Tail;
+            player.tail.push(Arc::clone(tile));
         } 
         tiles_map
             .get_mut(&player.curr_pos)
             .unwrap_throw()
+            .lock()
+            .unwrap()
             .role = Role::Player;
         *counter = 0;
     }
     *counter += 1;
 
     for (_, tile) in tiles_map.iter() {
-        if !tile.border {
-            match tile.role {
+        let tile_locked = tile.lock().unwrap();
+        if !tile_locked.border {
+            match tile_locked.role {
                 Role::Board =>  { ctx.set_fill_style_str("black") }
-                Role::Player =>  { ctx.set_fill_style_str("blue") }
+                Role::Player =>  { ctx.set_fill_style_str("yellow") }
                 Role::Tail => { ctx.set_fill_style_str("orange") }
             }
         } else {
-            if let Role::Player = tile.role {
+            if let Role::Player = tile_locked.role {
                 ctx.set_fill_style_str("blue");
             } else {
                 ctx.set_fill_style_str("gray");
             }
         }
         ctx.fill_rect(
-            tile.coord_abs.x, 
-            tile.coord_abs.y, 
+            tile_locked.coord_abs.x, 
+            tile_locked.coord_abs.y, 
             Tile::get_size(), 
             Tile::get_size()
         );
