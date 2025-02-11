@@ -76,11 +76,12 @@ impl Display for CoordTile {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug,Clone,PartialEq)]
 struct CoordAbs {
     x: f64,
     y: f64
 }
+#[derive(Clone)]
 pub struct Tile {
     coord_tile: CoordTile,
     coord_abs: CoordAbs,
@@ -90,7 +91,7 @@ pub struct Tile {
 impl Tile {
    fn get_size() -> f64 { 10. } 
 }
-#[derive(Debug)]
+#[derive(Debug,Clone,PartialEq)]
 enum Role {
     Player,
     Tail,
@@ -110,7 +111,7 @@ pub struct Player {
     pub curr_pos: CoordTile,
     pub prev_pos: CoordTile,
     pub movement: Move,
-    pub tail: Vec<Arc<Mutex<Tile>>>,
+    pub tail: Vec<Tile>,
 }
 impl Player {
     fn new() -> Self {
@@ -147,12 +148,13 @@ impl Game {
 lazy_static! {
     static ref GAME: Mutex<Game> = Mutex::new(Game::new(CoordTile{ x: 80, y: 60}));
     static ref PLAYER: Mutex<Player> = Mutex::new(Player::new());
-    static ref TILES_MAP: Mutex<HashMap<CoordTile,Arc<Mutex<Tile>>>> = Mutex::new(HashMap::new());
+    static ref TILES_MAP: Mutex<HashMap<CoordTile,Tile>> = Mutex::new(HashMap::new());
     static ref COUNTER: Mutex<u64> = Mutex::new(0);
 }
 
 
-fn create_tiles_map(tiles_map: &mut HashMap<CoordTile,Arc<Mutex<Tile>>>) {
+fn create_tiles_map() {
+    let tiles_map = &mut TILES_MAP.lock().unwrap();
     let game = GAME.lock().unwrap();
     let mut x = 0;
     let mut y = 0;
@@ -180,11 +182,9 @@ fn create_tiles_map(tiles_map: &mut HashMap<CoordTile,Arc<Mutex<Tile>>>) {
                 }
             };
             let tile_coord = tile.coord_tile.clone(); 
-            let mutex_tile = Mutex::new(tile);
-            let arc_tile = Arc::new(mutex_tile);
             tiles_map.insert(
                 tile_coord, 
-                arc_tile
+                tile
             );
             x += Tile::get_size() as u64;
         }
@@ -196,8 +196,7 @@ fn create_tiles_map(tiles_map: &mut HashMap<CoordTile,Arc<Mutex<Tile>>>) {
 #[wasm_bindgen]
 pub fn game_init() {
     panic::set_hook(Box::new(console_error_panic_hook::hook));
-    let tiles_map = &mut TILES_MAP.lock().unwrap();
-    create_tiles_map(tiles_map);
+    create_tiles_map();
 }
 
 pub fn tile_is_border(tile: &Tile, game: &Game) -> bool {
@@ -209,34 +208,46 @@ pub fn tile_is_border(tile: &Tile, game: &Game) -> bool {
 
 pub fn erase_tail(
     player: &mut Player, 
-    tiles_map: &mut HashMap<CoordTile,Arc<Mutex<Tile>>>,
+    tiles_map: &mut HashMap<CoordTile,Tile>,
     game: &Game
 ) {
     let curr_tile = tiles_map
         .get(&player.curr_pos)
-        .expect("function erase_tail panicked")
-        .lock()
-        .unwrap();
-
-    //log_out(&format!("{:?}",curr_tile.role));
+        .expect("function erase_tail panicked");
     let is_border = tile_is_border(&curr_tile, game);
-    drop(curr_tile);
-
     if is_border {
         if player.tail.len() == 0 { return }
         player
             .tail
-            .iter()
-            .for_each(|mutex_tile| {
-                let mut tile = mutex_tile.lock().unwrap();
-                tile.role = Role::Claimed;
+            .iter_mut()
+            .for_each(|tile| {
+                let ref_tile = tiles_map
+                    .get_mut(&tile.coord_tile)
+                    .expect("No tile found");
+                ref_tile.role = Role::Claimed;
             });
         player.tail = vec![];
     }
 }
 
-pub fn collect_tiles_to_claim() {
-    todo!()
+pub fn collect_tiles_to_claim(
+    player: &mut Player,
+    tiles_map: &mut HashMap<CoordTile,Tile>,
+    game: &Game,
+    curr_tile: Tile,
+    mut visited: Vec<Tile>
+) {
+    if curr_tile.role != Role::Board { return }
+    visited
+        .iter()
+        .for_each(|tile| {
+            if tile.coord_abs == curr_tile.coord_abs {return }
+        });
+    visited.push(curr_tile.clone());
+    let ref_tile = tiles_map
+        .get_mut(&curr_tile.coord_tile)
+        .expect("No tile found");
+    ref_tile.role = Role::Claimed;
 }
 pub fn claim_tiles() {
     todo!()
@@ -244,54 +255,77 @@ pub fn claim_tiles() {
 
 #[wasm_bindgen]
 pub fn render_game(ctx: &CanvasRenderingContext2d) {
-    let tiles_map = &mut TILES_MAP.lock().unwrap();
-    let player = &mut PLAYER.lock().unwrap();
-    let game = &mut GAME.lock().unwrap();
+    let mut tiles_map = TILES_MAP.lock().unwrap();
+    let mut player = PLAYER.lock().unwrap();
+    let game = GAME.lock().unwrap();
     let mut counter = COUNTER.lock().unwrap();
 
     if player.tail.len() > 0 {
-        erase_tail(player, tiles_map, game);
+        let tail_count = player
+            .tail
+            .iter()
+            .filter(|tile| !tile.border)
+            .count();
+        log_out(&format!("tail count: {}", tail_count));
+        erase_tail(&mut player, &mut tiles_map, &game);
+        let curr_tile = tiles_map
+            .get(&player.curr_pos)
+            .expect("function erase_tail panicked");
+        if tail_count > 0 && curr_tile.border {
+            log_out("tail non empty at the border");
+            let tile_init = tiles_map
+                .get(&CoordTile {
+                    x: curr_tile.coord_tile.x - 1,
+                    y: curr_tile.coord_tile.y + 1
+                })
+                .expect("No tile found");
+            let tile_initial = tile_init.clone();
+            let visited: Vec<Tile> = vec![];
+            collect_tiles_to_claim(
+                &mut player, 
+                &mut tiles_map, 
+                &game, 
+                tile_initial, 
+                visited
+            );
+        }
     }
 
-    if *counter > 3 {
-        move_player(player, game);
+    if *counter > 2 {
+        move_player(&mut player, &game);
         if player.curr_pos != player.prev_pos {
             let tile = tiles_map
-                .get(&player.prev_pos)
-                .expect("render_game panicked");
-            let mut locked_tile = tile.lock().unwrap();
-            locked_tile.role = Role::Tail;
-            player.tail.push(Arc::clone(tile));
+                .get_mut(&player.prev_pos)
+                .expect("No tile found");
+            tile.role = Role::Tail;
+            player.tail.push((*tile).clone());
         } 
         tiles_map
             .get_mut(&player.curr_pos)
-            .unwrap_throw()
-            .lock()
-            .unwrap()
+            .expect("No tile found")
             .role = Role::Player;
         *counter = 0;
     }
     *counter += 1;
 
     for (_, tile) in tiles_map.iter() {
-        let tile_locked = tile.lock().unwrap();
-        if !tile_locked.border {
-            match tile_locked.role {
+        if !tile.border {
+            match tile.role {
                 Role::Board =>  { ctx.set_fill_style_str("black") }
                 Role::Player =>  { ctx.set_fill_style_str("yellow") }
                 Role::Tail => { ctx.set_fill_style_str("orange") }
                 Role::Claimed => { ctx.set_fill_style_str("transparent") }
             }
         } else {
-            if let Role::Player = tile_locked.role {
+            if let Role::Player = tile.role {
                 ctx.set_fill_style_str("blue");
             } else {
                 ctx.set_fill_style_str("transparent");
             }
         }
         ctx.fill_rect(
-            tile_locked.coord_abs.x, 
-            tile_locked.coord_abs.y, 
+            tile.coord_abs.x, 
+            tile.coord_abs.y, 
             Tile::get_size(), 
             Tile::get_size()
         );
