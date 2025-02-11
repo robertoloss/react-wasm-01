@@ -3,6 +3,7 @@ extern crate console_error_panic_hook;
 use std::panic;
 mod rustcode;
 use std::{collections::HashMap, sync::{Arc, Mutex}};
+use std::collections::HashSet;
 use rustcode::utils::log_out;
 use web_sys::{console, CanvasRenderingContext2d};
 use lazy_static::lazy_static;
@@ -89,7 +90,7 @@ pub struct Tile {
     border: bool
 }
 impl Tile {
-   fn get_size() -> f64 { 10. } 
+   fn get_size() -> f64 { 5. } 
 }
 #[derive(Debug,Clone,PartialEq)]
 enum Role {
@@ -146,7 +147,7 @@ impl Game {
 }
 
 lazy_static! {
-    static ref GAME: Mutex<Game> = Mutex::new(Game::new(CoordTile{ x: 80, y: 60}));
+    static ref GAME: Mutex<Game> = Mutex::new(Game::new(CoordTile{ x: 80 * 2, y: 60 * 2}));
     static ref PLAYER: Mutex<Player> = Mutex::new(Player::new());
     static ref TILES_MAP: Mutex<HashMap<CoordTile,Tile>> = Mutex::new(HashMap::new());
     static ref COUNTER: Mutex<u64> = Mutex::new(0);
@@ -221,10 +222,9 @@ pub fn erase_tail(
             .tail
             .iter_mut()
             .for_each(|tile| {
-                let ref_tile = tiles_map
-                    .get_mut(&tile.coord_tile)
-                    .expect("No tile found");
-                ref_tile.role = Role::Claimed;
+                if let Some(ref_tile) = tiles_map.get_mut(&tile.coord_tile) {
+                    ref_tile.role = Role::Claimed;
+                }
             });
         player.tail = vec![];
     }
@@ -232,23 +232,43 @@ pub fn erase_tail(
 
 pub fn collect_tiles_to_claim(
     player: &mut Player,
-    tiles_map: &mut HashMap<CoordTile,Tile>,
+    tiles_map: &mut HashMap<CoordTile, Tile>,
     game: &Game,
-    curr_tile: Tile,
-    mut visited: Vec<Tile>
+    curr_tile: &Tile,  
+    visited: &mut Vec<CoordTile>,  
 ) {
-    if curr_tile.role != Role::Board { return }
-    visited
-        .iter()
-        .for_each(|tile| {
-            if tile.coord_abs == curr_tile.coord_abs {return }
-        });
-    visited.push(curr_tile.clone());
-    let ref_tile = tiles_map
-        .get_mut(&curr_tile.coord_tile)
-        .expect("No tile found");
-    ref_tile.role = Role::Claimed;
+    if curr_tile.role != Role::Board || visited.contains(&curr_tile.coord_tile) {
+        return;  
+    }
+
+    visited.push(curr_tile.coord_tile.clone());  
+
+    if let Some(ref_tile) = tiles_map.get_mut(&curr_tile.coord_tile) {
+        ref_tile.role = Role::Claimed;  
+    }
+    let directions = [
+        (-1, 0), (1, 0),
+        (0, -1), (0, 1),  
+    ];
+
+    for (dx, dy) in directions {
+        let new_x = curr_tile.coord_tile.x as i64 + dx;
+        let new_y = curr_tile.coord_tile.y as i64 + dy;
+
+        if new_x >= 0 && new_x < (game.tile_dim.x - (1 as u64)) as i64
+            && new_y >= 0 && new_y < (game.tile_dim.y - (1 as u64)) as i64
+        {
+            if let Some(new_tile) = tiles_map.get(&CoordTile {
+                x: new_x as u64,
+                y: new_y as u64,
+            }) {
+                let tile = new_tile.clone();
+                collect_tiles_to_claim(player, tiles_map, game, &tile, visited);
+            }
+        }
+    }
 }
+
 pub fn claim_tiles() {
     todo!()
 }
@@ -280,18 +300,19 @@ pub fn render_game(ctx: &CanvasRenderingContext2d) {
                 })
                 .expect("No tile found");
             let tile_initial = tile_init.clone();
-            let visited: Vec<Tile> = vec![];
+            let mut visited: Vec<CoordTile> = vec![];
+
             collect_tiles_to_claim(
                 &mut player, 
                 &mut tiles_map, 
                 &game, 
-                tile_initial, 
-                visited
+                &tile_initial, 
+                &mut visited
             );
         }
     }
 
-    if *counter > 2 {
+    if *counter > 1 {
         move_player(&mut player, &game);
         if player.curr_pos != player.prev_pos {
             let tile = tiles_map
