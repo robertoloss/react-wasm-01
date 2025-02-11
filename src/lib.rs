@@ -286,7 +286,7 @@ pub fn render_game(ctx: &CanvasRenderingContext2d) {
             if let Role::Player = tile_locked.role {
                 ctx.set_fill_style_str("blue");
             } else {
-                ctx.set_fill_style_str("gray");
+                ctx.set_fill_style_str("transparent");
             }
         }
         ctx.fill_rect(
