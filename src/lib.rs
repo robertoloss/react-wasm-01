@@ -1,19 +1,21 @@
 mod utils;
-extern crate console_error_panic_hook;
 use std::panic;
 mod rustcode;
-use std::{collections::HashMap, sync::{Arc, Mutex}};
+use std::{collections::HashMap, sync::Mutex};
 use std::collections::HashSet;
 use rustcode::utils::log_out;
-use web_sys::{console, CanvasRenderingContext2d};
+use web_sys::CanvasRenderingContext2d;
 use lazy_static::lazy_static;
 use wasm_bindgen::prelude::*;
 use std::fmt::{self,Display};
+use web_time::SystemTime;
+
 
 #[wasm_bindgen]
 extern "C" {
     fn alert(s: &str);
 }
+
 #[wasm_bindgen]
 pub fn event_listener(event_code: &str) {
     //console::log_1(&JsValue::from_str(event_code));
@@ -90,7 +92,7 @@ pub struct Tile {
     border: bool
 }
 impl Tile {
-   fn get_size() -> f64 { 5. } 
+   fn get_size() -> f64 { 8. } 
 }
 #[derive(Debug,Clone,PartialEq)]
 enum Role {
@@ -147,10 +149,11 @@ impl Game {
 }
 
 lazy_static! {
-    static ref GAME: Mutex<Game> = Mutex::new(Game::new(CoordTile{ x: 80 * 2, y: 60 * 2}));
+    static ref GAME: Mutex<Game> = Mutex::new(Game::new(CoordTile{ x: 100, y: 75}));
     static ref PLAYER: Mutex<Player> = Mutex::new(Player::new());
     static ref TILES_MAP: Mutex<HashMap<CoordTile,Tile>> = Mutex::new(HashMap::new());
     static ref COUNTER: Mutex<u64> = Mutex::new(0);
+    static ref LAST_TIME: Mutex<f64> = Mutex::new(0.0);
 }
 
 
@@ -230,55 +233,88 @@ pub fn erase_tail(
     }
 }
 
+
 pub fn collect_tiles_to_claim(
-    player: &mut Player,
     tiles_map: &mut HashMap<CoordTile, Tile>,
     game: &Game,
-    curr_tile: &Tile,  
-    visited: &mut Vec<CoordTile>,  
+    start_tile: &Tile, 
 ) {
-    if curr_tile.role != Role::Board || visited.contains(&curr_tile.coord_tile) {
-        return;  
-    }
+    let mut visited: HashSet<CoordTile> = HashSet::new();
+    let mut stack: Vec<CoordTile> = Vec::new();
 
-    visited.push(curr_tile.coord_tile.clone());  
+    stack.push(start_tile.coord_tile.clone());
 
-    if let Some(ref_tile) = tiles_map.get_mut(&curr_tile.coord_tile) {
-        ref_tile.role = Role::Claimed;  
-    }
-    let directions = [
-        (-1, 0), (1, 0),
-        (0, -1), (0, 1),  
-    ];
+    while let Some(curr_coord) = stack.pop() {
+        if !visited.insert(curr_coord.clone()) {
+            continue;
+        }
+        log_out("x");
 
-    for (dx, dy) in directions {
-        let new_x = curr_tile.coord_tile.x as i64 + dx;
-        let new_y = curr_tile.coord_tile.y as i64 + dy;
+        if let Some(ref_tile) = tiles_map.get_mut(&curr_coord) {
+            if ref_tile.role == Role::Board {
+                ref_tile.role = Role::Claimed;
+            } else {
+                continue;
+            }
+        }
 
-        if new_x >= 0 && new_x < (game.tile_dim.x - (1 as u64)) as i64
-            && new_y >= 0 && new_y < (game.tile_dim.y - (1 as u64)) as i64
-        {
-            if let Some(new_tile) = tiles_map.get(&CoordTile {
-                x: new_x as u64,
-                y: new_y as u64,
-            }) {
-                let tile = new_tile.clone();
-                collect_tiles_to_claim(player, tiles_map, game, &tile, visited);
+        let directions = [
+            (-1, 0), (1, 0),
+            (0, -1), (0, 1),  
+        ];
+
+        for (dx, dy) in directions {
+            let new_x = curr_coord.x as i64 + dx;
+            let new_y = curr_coord.y as i64 + dy;
+
+            if new_x >= 0 && new_x < (game.tile_dim.x - 1) as i64
+                && new_y >= 0 && new_y < (game.tile_dim.y - 1) as i64
+            {
+                let new_coord = CoordTile {
+                    x: new_x as u64,
+                    y: new_y as u64,
+                };
+
+                if !visited.contains(&new_coord) {
+                    stack.push(new_coord);
+                }
             }
         }
     }
 }
+
 
 pub fn claim_tiles() {
     todo!()
 }
 
 #[wasm_bindgen]
-pub fn render_game(ctx: &CanvasRenderingContext2d) {
+pub fn render_game(ctx: &CanvasRenderingContext2d, delta_time: f64) {
     let mut tiles_map = TILES_MAP.lock().unwrap();
     let mut player = PLAYER.lock().unwrap();
     let game = GAME.lock().unwrap();
     let mut counter = COUNTER.lock().unwrap();
+
+    let mut last_time = LAST_TIME.lock().unwrap();
+    let mut now = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .expect("time went backwards")
+        .as_secs_f64();
+
+    //log_out(&format!("diff {:?}", now - *last_time));
+    //log_out(&format!("true? {:?}", now - *last_time < 0.017));
+    
+    while now - *last_time < 0.017 {
+        now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .expect("time went backwards")
+            .as_secs_f64();
+    } 
+    *last_time = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .expect("time went backwards")
+        .as_secs_f64();
+
 
     if player.tail.len() > 0 {
         let tail_count = player
@@ -300,14 +336,11 @@ pub fn render_game(ctx: &CanvasRenderingContext2d) {
                 })
                 .expect("No tile found");
             let tile_initial = tile_init.clone();
-            let mut visited: Vec<CoordTile> = vec![];
 
             collect_tiles_to_claim(
-                &mut player, 
                 &mut tiles_map, 
                 &game, 
                 &tile_initial, 
-                &mut visited
             );
         }
     }

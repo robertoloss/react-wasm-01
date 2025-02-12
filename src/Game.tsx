@@ -27,13 +27,20 @@ export default function Game() {
       canvas.height = canvas.offsetHeight;
       ctx.imageSmoothingEnabled = false;
 
-      function gameLoop() {
+      let lastTime = performance.now()
+
+      function gameLoop(timestamp: number) {
         if (!ctx || !canvas) return;
+
+        const deltaTime = (timestamp - lastTime) / 1000; 
+        lastTime = timestamp;
+
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        render_game(ctx)
+
+        render_game(ctx, deltaTime)
         animationFrameId.current = requestAnimationFrame(gameLoop);
       };
-      gameLoop()
+      animationFrameId.current = requestAnimationFrame(gameLoop);
     }
     startGame()
     return () => {
