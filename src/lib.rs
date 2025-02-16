@@ -4,10 +4,11 @@ mod rustcode;
 use std::{collections::HashMap, sync::Mutex};
 use std::collections::HashSet;
 use rustcode::utils::log_out;
+use web_sys::console::log;
 use web_sys::CanvasRenderingContext2d;
 use lazy_static::lazy_static;
 use wasm_bindgen::prelude::*;
-use std::fmt::{self,Display};
+use std::fmt::{self, format, Display};
 use web_time::SystemTime;
 
 #[wasm_bindgen]
@@ -22,45 +23,66 @@ pub fn event_listener(event_code: &str) {
 
     match event_code {
         "ArrowDown" => { 
-            player.movement = Move::Down
+            player.movement = Move::Down;
+            player.moving = true;
         }
         "ArrowUp" => { 
-            player.movement = Move::Up
+            player.movement = Move::Up;
+            player.moving = true;
         }
         "ArrowLeft" => { 
-            player.movement = Move::Left
+            player.movement = Move::Left;
+            player.moving = true;
         }
         "ArrowRight" => { 
-            player.movement = Move::Right
+            player.movement = Move::Right;
+            player.moving = true;
         }
         _ => { println!("hey") }
     }
 }
 
-pub fn move_player(player: &mut Player, game: &Game) {
+pub fn move_player(
+    player: &mut Player, 
+    game: &Game,
+    tiles_map: &mut HashMap<CoordTile,Tile>
+) {
     if player.curr_pos != player.prev_pos {
         player.prev_pos = player.curr_pos.clone()
     }
+    let curr_tile = tiles_map.get(&player.curr_pos);
     match player.movement {
         Move::Up => { 
            if player.curr_pos.y > 0 {
+                player.moving = true;
                 player.curr_pos.y -= 1
-            }  
+            } else {
+                player.moving = false;
+            } 
         }
         Move::Down => { 
             if player.curr_pos.y < game.tile_dim.y - 1 { 
+                player.moving = true;
                 player.curr_pos.y += 1 
+            } else {
+                player.moving = false;
             }
         }
         Move::Left => { 
             if player.curr_pos.x > 0 {
+                player.moving = true;
                 player.curr_pos.x -= 1 
+            } else {
+                player.moving = false;
             } 
         }
         Move::Right => { 
             if player.curr_pos.x < game.tile_dim.x - 1 {
+                player.moving = true;
                 player.curr_pos.x += 1 
-            } 
+            } else {
+                player.moving = false;
+            }
         }
         Move::Still => { }
     }
@@ -88,7 +110,7 @@ pub struct Tile {
     coord_tile: CoordTile,
     coord_abs: CoordAbs,
     role: Role,
-    border: bool
+    occupied: Occupied,
 }
 impl Tile {
    fn get_size() -> f64 { 8. } 
@@ -96,11 +118,17 @@ impl Tile {
 
 #[derive(Debug,Clone,PartialEq)]
 enum Role {
-    Player,
-    Tail,
+    Border,
     Board,
     Claimed,
-    Enemy
+}
+
+#[derive(Debug,Clone,PartialEq)]
+enum Occupied {
+    Player,
+    Enemy,
+    Tail,
+    Empty
 }
 
 #[derive(PartialEq)]
@@ -118,6 +146,7 @@ pub struct Player {
     pub prev_pos: CoordTile,
     pub movement: Move,
     pub tail: Vec<Tile>,
+    pub moving: bool,
 }
 
 impl Player {
@@ -131,7 +160,8 @@ impl Player {
             curr_pos: init_pos.clone(),
             prev_pos: init_pos.clone(),
             movement: Move::Still,
-            tail: vec![]
+            tail: vec![],
+            moving: false,
         }
     }
 }
@@ -167,18 +197,13 @@ fn create_tiles_map() {
     let mut y = 0;
     while y < game.abs_dim.y as u64 {
         while x < game.abs_dim.x as u64 {
-            let mut tile = Tile {
-                role: Role::Board,
-                border: if 
-                    x == 0 || 
+            let border = x == 0 || 
                     y == 0 || 
                     x / Tile::get_size() as u64 == game.tile_dim.x - 1  || 
-                    y / Tile::get_size() as u64 == game.tile_dim.y - 1
-                {
-                    true
-                } else {
-                    false
-                },
+                    y / Tile::get_size() as u64 == game.tile_dim.y - 1;
+            let mut tile = Tile {
+                role: if border { Role::Border } else { Role::Board },
+                occupied: Occupied::Empty,
                 coord_tile: CoordTile {
                     x: x / Tile::get_size() as u64,
                     y: y / Tile::get_size() as u64
@@ -189,7 +214,7 @@ fn create_tiles_map() {
                 }
             };
             if tile.coord_tile.x == 40 && tile.coord_tile.y == 20 {
-                tile.role = Role::Enemy;
+                tile.occupied = Occupied::Enemy;
             }
             let tile_coord = tile.coord_tile.clone(); 
             tiles_map.insert(
@@ -209,30 +234,29 @@ pub fn game_init() {
     create_tiles_map();
 }
 
-pub fn tile_is_border(tile: &Tile, game: &Game) -> bool {
-    tile.coord_tile.x == 0 ||
-    tile.coord_tile.y == 0 ||
-    tile.coord_tile.x == game.tile_dim.x - 1 ||
-    tile.coord_tile.y == game.tile_dim.y - 1
-}
-
 pub fn erase_tail(
     player: &mut Player, 
     tiles_map: &mut HashMap<CoordTile,Tile>,
-    game: &Game
 ) {
     let curr_tile = tiles_map
         .get(&player.curr_pos)
-        .expect("function erase_tail panicked");
-    let is_border = tile_is_border(&curr_tile, game);
+        .expect("No tile found!");
+    let is_border = curr_tile.role == Role::Border;
     if is_border {
-        if player.tail.len() == 0 { return }
+        log_out(&format!("yep, it's border"));
+        if player.tail.len() == 0 { 
+            log_out("no tail");
+            return 
+        }
         player
             .tail
             .iter_mut()
             .for_each(|tile| {
                 if let Some(ref_tile) = tiles_map.get_mut(&tile.coord_tile) {
-                    ref_tile.role = Role::Claimed;
+                    ref_tile.occupied = Occupied::Empty;
+                    if ref_tile.role != Role::Border {
+                        ref_tile.role = Role::Claimed
+                    }
                 }
             });
         player.tail = vec![];
@@ -254,29 +278,31 @@ pub fn collect_tiles_to_claim(
     stack.push(start_tile.coord_tile.clone());
 
     while let Some(curr_coord) = stack.pop() {
+        log_out(&format!("\nvisited tile: {}", curr_coord));
         if !visited.insert(curr_coord.clone()) {
             continue;
         }
-        log_out("x");
-
         if let Some(ref_tile) = tiles_map.get_mut(&curr_coord) {
-            match ref_tile.role {
-                Role::Board => { 
-                    tiles_to_claim.push(ref_tile.coord_tile.clone());
-                },
-                Role::Enemy => {
-                    tiles_to_claim = vec![];
-                    break
-                },
-                _ => { continue }
+            log_out(&format!("tile.occupied: {:?}", ref_tile.occupied));
+            if ref_tile.occupied == Occupied::Enemy {
+                tiles_to_claim = vec![];
+                log_out("Enemy found!");
+                break
             }
+            if ref_tile.occupied == Occupied::Tail || ref_tile.occupied == Occupied::Player {
+                log_out("TAIL");
+                continue;
+            }
+            if ref_tile.role == Role::Border || ref_tile.role == Role::Claimed {
+                log_out("Border or claimed");
+                continue
+            }
+            tiles_to_claim.push(ref_tile.coord_tile.clone());
         }
-
         let directions = [
             (-1, 0), (1, 0),
             (0, -1), (0, 1),  
         ];
-
         for (dx, dy) in directions {
             let new_x = curr_coord.x as i64 + dx;
             let new_y = curr_coord.y as i64 + dy;
@@ -298,17 +324,61 @@ pub fn collect_tiles_to_claim(
     tiles_to_claim
 }
 
+fn is_new_border(
+    tile_coord: &CoordTile,
+    tiles_map: &mut HashMap<CoordTile,Tile>,
+    game: &Game
+) 
+    -> bool
+{
+    let directions: [(i64,i64); 8] = [
+        (-1,-1), (0,-1), (1,-1),
+        (-1, 0),         (1, 0),
+        (-1, 1), (0, 1), (1, 1)
+    ];
+    let mut res = false;
+    for dir in directions {
+        let new_x = tile_coord.x as i64 + dir.0;
+        let new_y = tile_coord.y as i64 + dir.1;
+
+        if  new_x >= 0 && new_x < (game.tile_dim.x - 1) as i64 &&
+            new_y >= 0 && new_y < (game.tile_dim.y - 1) as i64
+        {
+            if let Some(tile_around) = tiles_map.get(
+                &CoordTile { 
+                    x: (tile_coord.x as i64 + dir.0) as u64 , 
+                    y: (tile_coord.y as i64 + dir.1) as u64 
+                }) 
+            {
+                if tile_around.role == Role::Board {
+                    res = true;
+                    break
+                }
+            }
+        }
+    }
+    res
+}
 
 pub fn claim_tiles(
     tiles_map: &mut HashMap<CoordTile,Tile>,
-    tiles_to_claim: Vec<CoordTile>
+    tiles_to_claim: Vec<CoordTile>,
+    game: &Game
 ) {
+    log_out(&format!("{:?}", tiles_to_claim));
     tiles_to_claim
         .into_iter()
         .for_each(|coord| {
             if let Some(tile) = tiles_map.get_mut(&coord) {
+                log_out(&format!("claiming {}", coord));
                 tile.role = Role::Claimed;
             }
+            //let is_border = is_new_border(&coord, tiles_map, game);
+            //if is_border {
+            //    if let Some(tile) = tiles_map.get_mut(&coord) {
+            //        tile.role = Role::Border;
+            //    }
+            //}
         });
 }
 
@@ -322,12 +392,9 @@ pub fn render_game(ctx: &CanvasRenderingContext2d) {
     let mut last_time = LAST_TIME.lock().unwrap();
     let mut now = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
-        .expect("time went backwards")
+        .expect("A temporal paradox occurred!")
         .as_secs_f64();
 
-    //log_out(&format!("diff {:?}", now - *last_time));
-    //log_out(&format!("true? {:?}", now - *last_time < 0.017));
-    
     while now - *last_time < 0.017 {
         now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -343,16 +410,16 @@ pub fn render_game(ctx: &CanvasRenderingContext2d) {
         let tail_count = player
             .tail
             .iter()
-            .filter(|tile| !tile.border)
+            .filter(|tile| tile.role != Role::Border)
             .count();
 
-        erase_tail(&mut player, &mut tiles_map, &game);
 
         let curr_tile = tiles_map
             .get(&player.curr_pos)
             .expect("function erase_tail panicked");
+        let curr_is_border_or_claimed = curr_tile.role == Role::Border || curr_tile.role == Role::Claimed;
 
-        if tail_count > 0 && curr_tile.border {
+        if tail_count > 0 && curr_is_border_or_claimed {
             let mut tiles_init: Vec<Tile> = vec![];
 
             let directions = [
@@ -380,18 +447,9 @@ pub fn render_game(ctx: &CanvasRenderingContext2d) {
                     tiles_init.push(tile_init);
                 }
             }
-            let hhh: Vec<(u64,u64)> = tiles_init
-                    .clone()
-                    .into_iter()
-                    .map(|tile| (tile.coord_tile.x, tile.coord_tile.y))
-                    .into_iter()
-                    .collect();
-
-            log_out(&format!(
-                "tiles_init: {:?}", 
-                hhh
-            ));
-
+            //log_out(&format!("tiles_init {:?}", tiles_init));
+            //let tiles_to_claim = collect_tiles_to_claim(&mut tiles_map, &game, &tiles_init[0]);
+            //claim_tiles(&mut tiles_map, tiles_to_claim, &game);
             tiles_init
                 .into_iter()
                 .for_each(|tile| {
@@ -400,43 +458,45 @@ pub fn render_game(ctx: &CanvasRenderingContext2d) {
                         &game, 
                         &tile, 
                     );
-                    claim_tiles(&mut tiles_map, tiles_to_claim);
+                    claim_tiles(&mut tiles_map, tiles_to_claim, &game);
                 });
         }
+        erase_tail(&mut player, &mut tiles_map);
     }
 
     if *counter > 1 {
-        move_player(&mut player, &game);
+        move_player(&mut player, &game, &mut tiles_map);
+
         if player.curr_pos != player.prev_pos {
             let tile = tiles_map
                 .get_mut(&player.prev_pos)
                 .expect("No tile found");
-            tile.role = Role::Tail;
-            player.tail.push((*tile).clone());
+            if tile.role != Role::Claimed && tile.role != Role::Border {
+                tile.occupied = Occupied::Tail;
+                player.tail.push((*tile).clone());
+            } else {
+                tile.occupied = Occupied::Empty;
+            }
         } 
         tiles_map
             .get_mut(&player.curr_pos)
             .expect("No tile found")
-            .role = Role::Player;
+            .occupied = Occupied::Player;
         *counter = 0;
     }
     *counter += 1;
 
     for (_, tile) in tiles_map.iter() {
-        if !tile.border {
-            match tile.role {
-                Role::Board =>  { ctx.set_fill_style_str("black") }
-                Role::Player =>  { ctx.set_fill_style_str("yellow") }
-                Role::Tail => { ctx.set_fill_style_str("orange") }
-                Role::Claimed => { ctx.set_fill_style_str("transparent") }
-                Role::Enemy => { ctx.set_fill_style_str("red");}
-            }
-        } else {
-            if let Role::Player = tile.role {
-                ctx.set_fill_style_str("blue");
-            } else {
-                ctx.set_fill_style_str("transparent");
-            }
+        match tile.role {
+            Role::Board =>  { ctx.set_fill_style_str("black") }
+            Role::Claimed => { ctx.set_fill_style_str("transparent") }
+            Role::Border => { ctx.set_fill_style_str("gray");}
+        }
+        match tile.occupied {
+            Occupied::Player => { ctx.set_fill_style_str("blue") }
+            Occupied::Tail => { ctx.set_fill_style_str("orange") }
+            Occupied::Enemy => { ctx.set_fill_style_str("red") }
+            Occupied::Empty => { }
         }
         ctx.fill_rect(
             tile.coord_abs.x, 
