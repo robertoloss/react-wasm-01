@@ -10,7 +10,6 @@ use wasm_bindgen::prelude::*;
 use std::fmt::{self,Display};
 use web_time::SystemTime;
 
-
 #[wasm_bindgen]
 extern "C" {
     fn alert(s: &str);
@@ -94,13 +93,16 @@ pub struct Tile {
 impl Tile {
    fn get_size() -> f64 { 8. } 
 }
+
 #[derive(Debug,Clone,PartialEq)]
 enum Role {
     Player,
     Tail,
     Board,
-    Claimed
+    Claimed,
+    Enemy
 }
+
 #[derive(PartialEq)]
 pub enum Move {
     Up,
@@ -109,6 +111,7 @@ pub enum Move {
     Right,
     Still
 }
+
 pub struct Player {
     pub init_pos: CoordTile,
     pub curr_pos: CoordTile,
@@ -116,6 +119,7 @@ pub struct Player {
     pub movement: Move,
     pub tail: Vec<Tile>,
 }
+
 impl Player {
     fn new() -> Self {
         let init_pos = CoordTile {
@@ -156,7 +160,6 @@ lazy_static! {
     static ref LAST_TIME: Mutex<f64> = Mutex::new(0.0);
 }
 
-
 fn create_tiles_map() {
     let tiles_map = &mut TILES_MAP.lock().unwrap();
     let game = GAME.lock().unwrap();
@@ -164,7 +167,7 @@ fn create_tiles_map() {
     let mut y = 0;
     while y < game.abs_dim.y as u64 {
         while x < game.abs_dim.x as u64 {
-            let tile = Tile {
+            let mut tile = Tile {
                 role: Role::Board,
                 border: if 
                     x == 0 || 
@@ -185,6 +188,9 @@ fn create_tiles_map() {
                     y: y as f64 
                 }
             };
+            if tile.coord_tile.x == 40 && tile.coord_tile.y == 20 {
+                tile.role = Role::Enemy;
+            }
             let tile_coord = tile.coord_tile.clone(); 
             tiles_map.insert(
                 tile_coord, 
@@ -238,9 +244,12 @@ pub fn collect_tiles_to_claim(
     tiles_map: &mut HashMap<CoordTile, Tile>,
     game: &Game,
     start_tile: &Tile, 
-) {
+) 
+    -> Vec<CoordTile>
+{
     let mut visited: HashSet<CoordTile> = HashSet::new();
     let mut stack: Vec<CoordTile> = Vec::new();
+    let mut tiles_to_claim: Vec<CoordTile> = vec![];
 
     stack.push(start_tile.coord_tile.clone());
 
@@ -251,10 +260,15 @@ pub fn collect_tiles_to_claim(
         log_out("x");
 
         if let Some(ref_tile) = tiles_map.get_mut(&curr_coord) {
-            if ref_tile.role == Role::Board {
-                ref_tile.role = Role::Claimed;
-            } else {
-                continue;
+            match ref_tile.role {
+                Role::Board => { 
+                    tiles_to_claim.push(ref_tile.coord_tile.clone());
+                },
+                Role::Enemy => {
+                    tiles_to_claim = vec![];
+                    break
+                },
+                _ => { continue }
             }
         }
 
@@ -281,11 +295,21 @@ pub fn collect_tiles_to_claim(
             }
         }
     }
+    tiles_to_claim
 }
 
 
-pub fn claim_tiles() {
-    todo!()
+pub fn claim_tiles(
+    tiles_map: &mut HashMap<CoordTile,Tile>,
+    tiles_to_claim: Vec<CoordTile>
+) {
+    tiles_to_claim
+        .into_iter()
+        .for_each(|coord| {
+            if let Some(tile) = tiles_map.get_mut(&coord) {
+                tile.role = Role::Claimed;
+            }
+        });
 }
 
 #[wasm_bindgen]
@@ -371,11 +395,12 @@ pub fn render_game(ctx: &CanvasRenderingContext2d) {
             tiles_init
                 .into_iter()
                 .for_each(|tile| {
-                     collect_tiles_to_claim(
+                    let tiles_to_claim = collect_tiles_to_claim(
                         &mut tiles_map, 
                         &game, 
                         &tile, 
-                    )
+                    );
+                    claim_tiles(&mut tiles_map, tiles_to_claim);
                 });
         }
     }
@@ -404,6 +429,7 @@ pub fn render_game(ctx: &CanvasRenderingContext2d) {
                 Role::Player =>  { ctx.set_fill_style_str("yellow") }
                 Role::Tail => { ctx.set_fill_style_str("orange") }
                 Role::Claimed => { ctx.set_fill_style_str("transparent") }
+                Role::Enemy => { ctx.set_fill_style_str("red");}
             }
         } else {
             if let Role::Player = tile.role {
