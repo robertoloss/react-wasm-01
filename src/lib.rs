@@ -84,7 +84,7 @@ struct CoordAbs {
     x: f64,
     y: f64
 }
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub struct Tile {
     coord_tile: CoordTile,
     coord_abs: CoordAbs,
@@ -289,7 +289,7 @@ pub fn claim_tiles() {
 }
 
 #[wasm_bindgen]
-pub fn render_game(ctx: &CanvasRenderingContext2d, delta_time: f64) {
+pub fn render_game(ctx: &CanvasRenderingContext2d) {
     let mut tiles_map = TILES_MAP.lock().unwrap();
     let mut player = PLAYER.lock().unwrap();
     let game = GAME.lock().unwrap();
@@ -315,33 +315,68 @@ pub fn render_game(ctx: &CanvasRenderingContext2d, delta_time: f64) {
         .expect("time went backwards")
         .as_secs_f64();
 
-
     if player.tail.len() > 0 {
         let tail_count = player
             .tail
             .iter()
             .filter(|tile| !tile.border)
             .count();
-        log_out(&format!("tail count: {}", tail_count));
+
         erase_tail(&mut player, &mut tiles_map, &game);
+
         let curr_tile = tiles_map
             .get(&player.curr_pos)
             .expect("function erase_tail panicked");
-        if tail_count > 0 && curr_tile.border {
-            log_out("tail non empty at the border");
-            let tile_init = tiles_map
-                .get(&CoordTile {
-                    x: curr_tile.coord_tile.x - 1,
-                    y: curr_tile.coord_tile.y + 1
-                })
-                .expect("No tile found");
-            let tile_initial = tile_init.clone();
 
-            collect_tiles_to_claim(
-                &mut tiles_map, 
-                &game, 
-                &tile_initial, 
-            );
+        if tail_count > 0 && curr_tile.border {
+            let mut tiles_init: Vec<Tile> = vec![];
+
+            let directions = [
+                (-1, -1), (1, -1),
+                (-1, 1), (1, 1),  
+            ];
+            log_out(&format!("curr_tile: {}, {}", curr_tile.coord_tile.x, curr_tile.coord_tile.y));
+
+            for (dx, dy) in directions {
+                let new_x = curr_tile.coord_tile.x as i64 + dx;
+                let new_y = curr_tile.coord_tile.y as i64 + dy;
+                log_out(&format!("new_x {}, new_y {}", new_x, new_y));
+
+                if new_x >= 0 && new_x < (game.tile_dim.x - 1) as i64
+                    && new_y >= 0 && new_y < (game.tile_dim.y - 1) as i64
+                {
+                    log_out(&format!("ok: {},{}", new_x, new_y));
+                    let tile_init = tiles_map.get(
+                        &CoordTile {
+                            x: new_x as u64,
+                            y: new_y as u64
+                        })
+                        .expect("No tile found");
+                    let tile_init = tile_init.clone();
+                    tiles_init.push(tile_init);
+                }
+            }
+            let hhh: Vec<(u64,u64)> = tiles_init
+                    .clone()
+                    .into_iter()
+                    .map(|tile| (tile.coord_tile.x, tile.coord_tile.y))
+                    .into_iter()
+                    .collect();
+
+            log_out(&format!(
+                "tiles_init: {:?}", 
+                hhh
+            ));
+
+            tiles_init
+                .into_iter()
+                .for_each(|tile| {
+                     collect_tiles_to_claim(
+                        &mut tiles_map, 
+                        &game, 
+                        &tile, 
+                    )
+                });
         }
     }
 
