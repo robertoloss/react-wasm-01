@@ -111,6 +111,7 @@ pub struct Tile {
     coord_abs: CoordAbs,
     role: Role,
     occupied: Occupied,
+    border_to_clear: bool,
 }
 impl Tile {
    fn get_size() -> f64 { 8. } 
@@ -203,6 +204,7 @@ fn create_tiles_map() {
                     y / Tile::get_size() as u64 == game.tile_dim.y - 1;
             let mut tile = Tile {
                 role: if border { Role::Border } else { Role::Board },
+                border_to_clear: false,
                 occupied: Occupied::Empty,
                 coord_tile: CoordTile {
                     x: x / Tile::get_size() as u64,
@@ -254,9 +256,7 @@ pub fn erase_tail(
             .for_each(|tile| {
                 if let Some(ref_tile) = tiles_map.get_mut(&tile.coord_tile) {
                     ref_tile.occupied = Occupied::Empty;
-                    if ref_tile.role != Role::Border {
-                        ref_tile.role = Role::Claimed
-                    }
+                    ref_tile.role = Role::Claimed
                 }
             });
         player.tail = vec![];
@@ -286,17 +286,16 @@ pub fn collect_tiles_to_claim(
             log_out(&format!("tile.occupied: {:?}", ref_tile.occupied));
             if ref_tile.occupied == Occupied::Enemy {
                 tiles_to_claim = vec![];
-                log_out("Enemy found!");
                 break
             }
             if ref_tile.occupied == Occupied::Tail || ref_tile.occupied == Occupied::Player {
-                log_out("TAIL");
                 continue;
             }
-            if ref_tile.role == Role::Border || ref_tile.role == Role::Claimed {
-                log_out("Border or claimed");
+            if ref_tile.role == Role::Border {
+                tiles_to_claim.push(ref_tile.coord_tile.clone());
                 continue
             }
+            if ref_tile.role == Role::Claimed { continue }
             tiles_to_claim.push(ref_tile.coord_tile.clone());
         }
         let directions = [
@@ -324,61 +323,17 @@ pub fn collect_tiles_to_claim(
     tiles_to_claim
 }
 
-fn is_new_border(
-    tile_coord: &CoordTile,
-    tiles_map: &mut HashMap<CoordTile,Tile>,
-    game: &Game
-) 
-    -> bool
-{
-    let directions: [(i64,i64); 8] = [
-        (-1,-1), (0,-1), (1,-1),
-        (-1, 0),         (1, 0),
-        (-1, 1), (0, 1), (1, 1)
-    ];
-    let mut res = false;
-    for dir in directions {
-        let new_x = tile_coord.x as i64 + dir.0;
-        let new_y = tile_coord.y as i64 + dir.1;
-
-        if  new_x >= 0 && new_x < (game.tile_dim.x - 1) as i64 &&
-            new_y >= 0 && new_y < (game.tile_dim.y - 1) as i64
-        {
-            if let Some(tile_around) = tiles_map.get(
-                &CoordTile { 
-                    x: (tile_coord.x as i64 + dir.0) as u64 , 
-                    y: (tile_coord.y as i64 + dir.1) as u64 
-                }) 
-            {
-                if tile_around.role == Role::Board {
-                    res = true;
-                    break
-                }
-            }
-        }
-    }
-    res
-}
-
 pub fn claim_tiles(
     tiles_map: &mut HashMap<CoordTile,Tile>,
-    tiles_to_claim: Vec<CoordTile>,
-    game: &Game
+    tiles_to_claim: &Vec<CoordTile>,
 ) {
     log_out(&format!("{:?}", tiles_to_claim));
     tiles_to_claim
         .into_iter()
         .for_each(|coord| {
             if let Some(tile) = tiles_map.get_mut(&coord) {
-                log_out(&format!("claiming {}", coord));
                 tile.role = Role::Claimed;
             }
-            //let is_border = is_new_border(&coord, tiles_map, game);
-            //if is_border {
-            //    if let Some(tile) = tiles_map.get_mut(&coord) {
-            //        tile.role = Role::Border;
-            //    }
-            //}
         });
 }
 
@@ -412,8 +367,6 @@ pub fn render_game(ctx: &CanvasRenderingContext2d) {
             .iter()
             .filter(|tile| tile.role != Role::Border)
             .count();
-
-
         let curr_tile = tiles_map
             .get(&player.curr_pos)
             .expect("function erase_tail panicked");
@@ -458,7 +411,7 @@ pub fn render_game(ctx: &CanvasRenderingContext2d) {
                         &game, 
                         &tile, 
                     );
-                    claim_tiles(&mut tiles_map, tiles_to_claim, &game);
+                    claim_tiles(&mut tiles_map, &tiles_to_claim);
                 });
         }
         erase_tail(&mut player, &mut tiles_map);
@@ -490,7 +443,7 @@ pub fn render_game(ctx: &CanvasRenderingContext2d) {
         match tile.role {
             Role::Board =>  { ctx.set_fill_style_str("black") }
             Role::Claimed => { ctx.set_fill_style_str("transparent") }
-            Role::Border => { ctx.set_fill_style_str("gray");}
+            Role::Border => { ctx.set_fill_style_str("transparent");}
         }
         match tile.occupied {
             Occupied::Player => { ctx.set_fill_style_str("blue") }
