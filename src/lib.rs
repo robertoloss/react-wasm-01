@@ -416,7 +416,6 @@ pub fn erase_tail(
     let curr_is_border_or_claimed = curr_tile.role == Role::Border || curr_tile.role == Role::Claimed;
 
     if curr_is_border_or_claimed {
-        log_out(&format!("yep, it's border"));
         if player.tail.len() == 0 { 
             log_out("no tail");
             return 
