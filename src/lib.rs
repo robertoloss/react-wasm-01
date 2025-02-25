@@ -23,19 +23,29 @@ pub enum EnemyDir {
     DownLeft
 }
 pub struct Enemy {
+    timer: u64,
     pos_tile: CoordTile,
+    prev_pos_tile: CoordTile,
     direction: EnemyDir,
 }
 impl Enemy {
     fn moves(self: &mut Self, tiles_map: &mut HashMap<CoordTile, Tile>) {
         let new_pos_tile = tile_enemy_moves_to(self);
+        //log_out(&format!("new_pos_tile {:?}", new_pos_tile));
         let new_pos_role = tiles_map
             .get(&new_pos_tile)
-            .expect("Enemy moves: no tile found")
+            .expect(&format!(
+                "Enemy moves: no tile found at {} {:?}",
+                new_pos_tile,
+                tiles_map
+                    .get(&self.pos_tile)
+                    .expect("Z")
+                .role
+            ))
             .role
             .clone();
 
-        if new_pos_role == Role::Claimed {
+        if new_pos_role == Role::Claimed || new_pos_role == Role::Border {
             let curr_dir = self.direction.clone();
             match curr_dir {
                 EnemyDir::DownLeft => {
@@ -69,12 +79,12 @@ impl Enemy {
                         self.pos_tile.x + 1, 
                         self.pos_tile.y - 1, 
                         tiles_map
-                    ) { self.direction = EnemyDir::UpRight}
+                    ) { self.direction = EnemyDir::UpRight; }
                     else if check_if_tile_empty(
-                        self.pos_tile.x + 1, 
-                        self.pos_tile.y - 1, 
+                        self.pos_tile.x - 1, 
+                        self.pos_tile.y + 1, 
                         tiles_map
-                    ) { self.direction = EnemyDir::DownLeft }
+                    ) { self.direction = EnemyDir::DownLeft; }
                     else { self.direction = EnemyDir::DownRight }
                 }
                 EnemyDir::UpRight => {
@@ -91,6 +101,10 @@ impl Enemy {
                     else { self.direction = EnemyDir::DownLeft }
                 }
             }
+        }
+
+        if self.pos_tile != self.prev_pos_tile {
+            self.prev_pos_tile = self.pos_tile.clone()
         }
 
         match &self.direction {
@@ -119,6 +133,11 @@ pub fn check_if_tile_empty(x: u64, y: u64, tiles_map: &mut HashMap<CoordTile, Ti
         .get(&CoordTile { x, y })
         .expect("check_if_tile_empty: no tile found")
         .occupied == Occupied::Empty
+    &&
+    tiles_map
+        .get(&CoordTile { x, y })
+        .expect("check_if_tile_empty: no tile found")
+        .role != Role::Border
 }
 
 pub fn tile_enemy_moves_to(enemy: &Enemy) -> CoordTile {
@@ -368,7 +387,12 @@ pub fn game_init() {
     panic::set_hook(Box::new(console_error_panic_hook::hook));
     create_tiles_map();
     let new_enemy = Enemy {
+        timer: 0,
         pos_tile: CoordTile {
+            x: 6,
+            y: 6,
+        },
+        prev_pos_tile: CoordTile {
             x: 6,
             y: 6,
         },
@@ -505,18 +529,23 @@ pub fn render_game(ctx: &CanvasRenderingContext2d) {
 
     //log_out(&format!("tail: {}", player.tail.len()));
 
-    enemies
-        .iter_mut()
-        .for_each(|enemy| enemy.moves(&mut tiles_map));
 
-    enemies
-        .iter_mut()
-        .for_each(|enemy| {
-            tiles_map
-                .get_mut(&enemy.pos_tile)
-                .expect("Enemies iter in render: no tile found")
-                .occupied = Occupied::Enemy;
-        });
+    for enemy in enemies.iter_mut() {
+        if enemy.timer < 2 {
+            enemy.timer += 1;
+            continue
+        }
+        enemy.timer = 0;
+        enemy.moves(&mut tiles_map);
+        tiles_map
+            .get_mut(&enemy.pos_tile)
+            .expect("Enemies iter in render: no tile found")
+            .occupied = Occupied::Enemy;
+        tiles_map
+            .get_mut(&enemy.prev_pos_tile)
+            .expect("Enemies iter in render: no tile found")
+            .occupied = Occupied::Empty;
+    };
     
 
     if player.tail.len() > 0 {
@@ -541,7 +570,7 @@ pub fn render_game(ctx: &CanvasRenderingContext2d) {
                 (-1, -1), (1, -1),
                 (-1, 1), (1, 1),  
             ];
-            log_out(&format!("curr_tile: {}, {}", curr_tile.coord_tile.x, curr_tile.coord_tile.y));
+            //log_out(&format!("curr_tile: {}, {}", curr_tile.coord_tile.x, curr_tile.coord_tile.y));
 
             for (dx, dy) in directions {
                 let new_x = curr_tile.coord_tile.x as i64 + dx;
