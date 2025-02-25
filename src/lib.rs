@@ -4,7 +4,6 @@ mod rustcode;
 use std::{collections::HashMap, sync::Mutex};
 use std::collections::HashSet;
 use rustcode::utils::log_out;
-use web_sys::console::log;
 use web_sys::CanvasRenderingContext2d;
 use lazy_static::lazy_static;
 use wasm_bindgen::prelude::*;
@@ -14,6 +13,138 @@ use web_time::SystemTime;
 #[wasm_bindgen]
 extern "C" {
     fn alert(s: &str);
+}
+
+#[derive(Clone)]
+pub enum EnemyDir {
+    UpRight,
+    UpLeft,
+    DownRight,
+    DownLeft
+}
+pub struct Enemy {
+    pos_tile: CoordTile,
+    direction: EnemyDir,
+}
+impl Enemy {
+    fn moves(self: &mut Self, tiles_map: &mut HashMap<CoordTile, Tile>) {
+        let new_pos_tile = tile_enemy_moves_to(self);
+        let new_pos_role = tiles_map
+            .get(&new_pos_tile)
+            .expect("Enemy moves: no tile found")
+            .role
+            .clone();
+
+        if new_pos_role == Role::Claimed {
+            let curr_dir = self.direction.clone();
+            match curr_dir {
+                EnemyDir::DownLeft => {
+                    if check_if_tile_empty(
+                        self.pos_tile.x - 1, 
+                        self.pos_tile.y - 1, 
+                        tiles_map
+                    ) { self.direction = EnemyDir::UpLeft}
+                    else if check_if_tile_empty(
+                        self.pos_tile.x + 1, 
+                        self.pos_tile.y + 1, 
+                        tiles_map
+                    ) { self.direction = EnemyDir::DownRight }
+                    else { self.direction = EnemyDir::UpRight }
+                }
+                EnemyDir::DownRight => {
+                    if check_if_tile_empty(
+                        self.pos_tile.x + 1, 
+                        self.pos_tile.y - 1, 
+                        tiles_map
+                    ) { self.direction = EnemyDir::UpRight}
+                    else if check_if_tile_empty(
+                        self.pos_tile.x - 1, 
+                        self.pos_tile.y + 1, 
+                        tiles_map
+                    ) { self.direction = EnemyDir::DownLeft }
+                    else { self.direction = EnemyDir::UpLeft }
+                }
+                EnemyDir::UpLeft => {
+                    if check_if_tile_empty(
+                        self.pos_tile.x + 1, 
+                        self.pos_tile.y - 1, 
+                        tiles_map
+                    ) { self.direction = EnemyDir::UpRight}
+                    else if check_if_tile_empty(
+                        self.pos_tile.x + 1, 
+                        self.pos_tile.y - 1, 
+                        tiles_map
+                    ) { self.direction = EnemyDir::DownLeft }
+                    else { self.direction = EnemyDir::DownRight }
+                }
+                EnemyDir::UpRight => {
+                    if check_if_tile_empty(
+                        self.pos_tile.x - 1, 
+                        self.pos_tile.y - 1, 
+                        tiles_map
+                    ) { self.direction = EnemyDir::UpLeft}
+                    else if check_if_tile_empty(
+                        self.pos_tile.x + 1, 
+                        self.pos_tile.y - 1, 
+                        tiles_map
+                    ) { self.direction = EnemyDir::DownRight }
+                    else { self.direction = EnemyDir::DownLeft }
+                }
+            }
+        }
+
+        match &self.direction {
+            EnemyDir::UpRight => {
+                self.pos_tile.x += 1;
+                self.pos_tile.y -= 1;
+            }
+            EnemyDir::UpLeft => {
+                self.pos_tile.x -= 1;
+                self.pos_tile.y -= 1;
+            } 
+            EnemyDir::DownRight => {
+                self.pos_tile.x += 1;
+                self.pos_tile.y += 1;
+            }
+            EnemyDir::DownLeft => {
+                self.pos_tile.x -= 1;
+                self.pos_tile.y += 1;
+            }
+        }
+    }
+}
+
+pub fn check_if_tile_empty(x: u64, y: u64, tiles_map: &mut HashMap<CoordTile, Tile>) -> bool {
+    tiles_map
+        .get(&CoordTile { x, y })
+        .expect("check_if_tile_empty: no tile found")
+        .occupied == Occupied::Empty
+}
+
+pub fn tile_enemy_moves_to(enemy: &Enemy) -> CoordTile {
+    let mut tile = CoordTile {
+        x: enemy.pos_tile.x,
+        y: enemy.pos_tile.y
+    };
+    match enemy.direction {
+        EnemyDir::UpRight => {
+            tile.x += 1;
+            tile.y -= 1;
+        }
+        EnemyDir::UpLeft => {
+            tile.x -= 1;
+            tile.y -= 1;
+        } 
+        EnemyDir::DownRight => {
+            tile.x += 1;
+            tile.y += 1;
+        }
+        EnemyDir::DownLeft => {
+            tile.x -= 1;
+            tile.y += 1;
+        }
+    }
+    tile
 }
 
 #[wasm_bindgen]
@@ -111,10 +242,9 @@ pub struct Tile {
     coord_abs: CoordAbs,
     role: Role,
     occupied: Occupied,
-    border_to_clear: bool,
 }
 impl Tile {
-   fn get_size() -> f64 { 8. } 
+   fn get_size() -> f64 { 8. } // 8. 
 }
 
 #[derive(Debug,Clone,PartialEq)]
@@ -184,11 +314,15 @@ impl Game {
 }
 
 lazy_static! {
-    static ref GAME: Mutex<Game> = Mutex::new(Game::new(CoordTile{ x: 100, y: 75}));
+    static ref GAME: Mutex<Game> = Mutex::new(Game::new(CoordTile{ 
+        x: (( 8. / Tile::get_size()) * 100.) as u64, 
+        y: (( 8. / Tile::get_size()) * 75.) as u64
+    })); // 100 75
     static ref PLAYER: Mutex<Player> = Mutex::new(Player::new());
     static ref TILES_MAP: Mutex<HashMap<CoordTile,Tile>> = Mutex::new(HashMap::new());
     static ref COUNTER: Mutex<u64> = Mutex::new(0);
     static ref LAST_TIME: Mutex<f64> = Mutex::new(0.0);
+    static ref ENEMIES: Mutex<Vec<Enemy>> = Mutex::new(vec![]);
 }
 
 fn create_tiles_map() {
@@ -204,7 +338,6 @@ fn create_tiles_map() {
                     y / Tile::get_size() as u64 == game.tile_dim.y - 1;
             let mut tile = Tile {
                 role: if border { Role::Border } else { Role::Board },
-                border_to_clear: false,
                 occupied: Occupied::Empty,
                 coord_tile: CoordTile {
                     x: x / Tile::get_size() as u64,
@@ -234,6 +367,15 @@ fn create_tiles_map() {
 pub fn game_init() {
     panic::set_hook(Box::new(console_error_panic_hook::hook));
     create_tiles_map();
+    let new_enemy = Enemy {
+        pos_tile: CoordTile {
+            x: 6,
+            y: 6,
+        },
+        direction: EnemyDir::DownRight
+    };
+    let mut enemies = ENEMIES.lock().unwrap();
+    enemies.push(new_enemy);
 }
 
 pub fn erase_tail(
@@ -243,8 +385,10 @@ pub fn erase_tail(
     let curr_tile = tiles_map
         .get(&player.curr_pos)
         .expect("No tile found!");
-    let is_border = curr_tile.role == Role::Border;
-    if is_border {
+
+    let curr_is_border_or_claimed = curr_tile.role == Role::Border || curr_tile.role == Role::Claimed;
+
+    if curr_is_border_or_claimed {
         log_out(&format!("yep, it's border"));
         if player.tail.len() == 0 { 
             log_out("no tail");
@@ -278,12 +422,10 @@ pub fn collect_tiles_to_claim(
     stack.push(start_tile.coord_tile.clone());
 
     while let Some(curr_coord) = stack.pop() {
-        log_out(&format!("\nvisited tile: {}", curr_coord));
         if !visited.insert(curr_coord.clone()) {
             continue;
         }
         if let Some(ref_tile) = tiles_map.get_mut(&curr_coord) {
-            log_out(&format!("tile.occupied: {:?}", ref_tile.occupied));
             if ref_tile.occupied == Occupied::Enemy {
                 tiles_to_claim = vec![];
                 break
@@ -327,7 +469,6 @@ pub fn claim_tiles(
     tiles_map: &mut HashMap<CoordTile,Tile>,
     tiles_to_claim: &Vec<CoordTile>,
 ) {
-    log_out(&format!("{:?}", tiles_to_claim));
     tiles_to_claim
         .into_iter()
         .for_each(|coord| {
@@ -343,6 +484,7 @@ pub fn render_game(ctx: &CanvasRenderingContext2d) {
     let mut player = PLAYER.lock().unwrap();
     let game = GAME.lock().unwrap();
     let mut counter = COUNTER.lock().unwrap();
+    let mut enemies = ENEMIES.lock().unwrap();
 
     let mut last_time = LAST_TIME.lock().unwrap();
     let mut now = SystemTime::now()
@@ -361,18 +503,38 @@ pub fn render_game(ctx: &CanvasRenderingContext2d) {
         .expect("time went backwards")
         .as_secs_f64();
 
+    //log_out(&format!("tail: {}", player.tail.len()));
+
+    enemies
+        .iter_mut()
+        .for_each(|enemy| enemy.moves(&mut tiles_map));
+
+    enemies
+        .iter_mut()
+        .for_each(|enemy| {
+            tiles_map
+                .get_mut(&enemy.pos_tile)
+                .expect("Enemies iter in render: no tile found")
+                .occupied = Occupied::Enemy;
+        });
+    
+
     if player.tail.len() > 0 {
         let tail_count = player
             .tail
             .iter()
             .filter(|tile| tile.role != Role::Border)
             .count();
+
         let curr_tile = tiles_map
             .get(&player.curr_pos)
             .expect("function erase_tail panicked");
+
         let curr_is_border_or_claimed = curr_tile.role == Role::Border || curr_tile.role == Role::Claimed;
 
         if tail_count > 0 && curr_is_border_or_claimed {
+            player.movement = Move::Still;
+
             let mut tiles_init: Vec<Tile> = vec![];
 
             let directions = [
@@ -384,12 +546,10 @@ pub fn render_game(ctx: &CanvasRenderingContext2d) {
             for (dx, dy) in directions {
                 let new_x = curr_tile.coord_tile.x as i64 + dx;
                 let new_y = curr_tile.coord_tile.y as i64 + dy;
-                log_out(&format!("new_x {}, new_y {}", new_x, new_y));
 
                 if new_x >= 0 && new_x < (game.tile_dim.x - 1) as i64
                     && new_y >= 0 && new_y < (game.tile_dim.y - 1) as i64
                 {
-                    log_out(&format!("ok: {},{}", new_x, new_y));
                     let tile_init = tiles_map.get(
                         &CoordTile {
                             x: new_x as u64,
@@ -400,9 +560,6 @@ pub fn render_game(ctx: &CanvasRenderingContext2d) {
                     tiles_init.push(tile_init);
                 }
             }
-            //log_out(&format!("tiles_init {:?}", tiles_init));
-            //let tiles_to_claim = collect_tiles_to_claim(&mut tiles_map, &game, &tiles_init[0]);
-            //claim_tiles(&mut tiles_map, tiles_to_claim, &game);
             tiles_init
                 .into_iter()
                 .for_each(|tile| {
