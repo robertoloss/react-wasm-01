@@ -95,7 +95,7 @@ impl Enemy {
                     ) { self.direction = EnemyDir::UpLeft}
                     else if check_if_tile_empty(
                         self.pos_tile.x + 1, 
-                        self.pos_tile.y - 1, 
+                        self.pos_tile.y + 1, 
                         tiles_map
                     ) { self.direction = EnemyDir::DownRight }
                     else { self.direction = EnemyDir::DownLeft }
@@ -132,12 +132,12 @@ pub fn check_if_tile_empty(x: u64, y: u64, tiles_map: &mut HashMap<CoordTile, Ti
     tiles_map
         .get(&CoordTile { x, y })
         .expect("check_if_tile_empty: no tile found")
-        .occupied == Occupied::Empty
+        .role != Role::Border
     &&
     tiles_map
         .get(&CoordTile { x, y })
         .expect("check_if_tile_empty: no tile found")
-        .role != Role::Border
+        .role != Role::Claimed
 }
 
 pub fn tile_enemy_moves_to(enemy: &Enemy) -> CoordTile {
@@ -367,9 +367,9 @@ fn create_tiles_map() {
                     y: y as f64 
                 }
             };
-            if tile.coord_tile.x == 40 && tile.coord_tile.y == 20 {
-                tile.occupied = Occupied::Enemy;
-            }
+            //if tile.coord_tile.x == 40 && tile.coord_tile.y == 20 {
+            //    tile.occupied = Occupied::Enemy;
+            //}
             let tile_coord = tile.coord_tile.clone(); 
             tiles_map.insert(
                 tile_coord, 
@@ -386,20 +386,23 @@ fn create_tiles_map() {
 pub fn game_init() {
     panic::set_hook(Box::new(console_error_panic_hook::hook));
     create_tiles_map();
+    let pos = CoordTile { x: 6, y: 6, };
+    let pos2 = CoordTile { x: 23, y: 27, };
     let new_enemy = Enemy {
         timer: 0,
-        pos_tile: CoordTile {
-            x: 6,
-            y: 6,
-        },
-        prev_pos_tile: CoordTile {
-            x: 6,
-            y: 6,
-        },
+        pos_tile: pos.clone(),
+        prev_pos_tile: pos,
         direction: EnemyDir::DownRight
+    };
+    let new_enemy2 = Enemy {
+        timer: 0,
+        pos_tile: pos2.clone(),
+        prev_pos_tile: pos2,
+        direction: EnemyDir::UpLeft
     };
     let mut enemies = ENEMIES.lock().unwrap();
     enemies.push(new_enemy);
+    enemies.push(new_enemy2);
 }
 
 pub fn erase_tail(
