@@ -263,7 +263,7 @@ pub struct Tile {
     occupied: Occupied,
 }
 impl Tile {
-   fn get_size() -> f64 { 8. } // 8. 
+   fn get_size() -> f64 { 4. } // 8. set tile width 
 }
 
 #[derive(Debug,Clone,PartialEq)]
@@ -518,7 +518,7 @@ pub fn render_game(ctx: &CanvasRenderingContext2d) {
         .expect("A temporal paradox occurred!")
         .as_secs_f64();
 
-    while now - *last_time < 0.017 {
+    while now - *last_time < 0.032 { // 0.017
         now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .expect("time went backwards")
@@ -605,7 +605,7 @@ pub fn render_game(ctx: &CanvasRenderingContext2d) {
         erase_tail(&mut player, &mut tiles_map);
     }
 
-    if *counter > 1 {
+    if *counter > 0 {
         move_player(&mut player, &game, &mut tiles_map);
 
         if player.curr_pos != player.prev_pos {
