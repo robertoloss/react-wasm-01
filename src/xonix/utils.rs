@@ -1,3 +1,13 @@
+use std::fmt::Debug;
+use wasm_bindgen::JsValue;
+use web_sys::console;
+
+
+pub fn log_out<T: Debug>(s: T) {
+    console::log_1(&JsValue::from_str(&format!("{:?}",s)))
+}
+
+
 #[allow(dead_code)]
 pub fn set_panic_hook() {
     // When the `console_error_panic_hook` feature is enabled, we can call the
