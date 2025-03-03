@@ -1,9 +1,6 @@
-use wasm_bindgen::prelude::wasm_bindgen;
 use crate::{xonix::player::types::Move, PLAYER};
 
-
-#[wasm_bindgen]
-pub fn event_listeners(event_code: &str) {
+pub fn listen_to_events(event_code: &str) {
     //console::log_1(&JsValue::from_str(event_code));
     let player = &mut PLAYER.lock().unwrap();
 

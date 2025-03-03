@@ -3,6 +3,7 @@ use wasm_bindgen::JsValue;
 use web_sys::console;
 
 
+#[allow(dead_code)]
 pub fn log_out<T: Debug>(s: T) {
     console::log_1(&JsValue::from_str(&format!("{:?}",s)))
 }

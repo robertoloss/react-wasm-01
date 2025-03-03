@@ -1,5 +1,4 @@
-use std::time::SystemTime;
-
+use web_time::SystemTime;
 
 pub fn delta_wait(last_time: &mut f64) {
     let mut now = SystemTime::now()
