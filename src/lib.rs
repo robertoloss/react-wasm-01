@@ -7,7 +7,7 @@ use xonix::enemies::types::Enemy;
 use xonix::game::create_tiles_map::create_tiles_map;
 use xonix::game::delta_wait::delta_wait;
 use xonix::game::draw::draw;
-use xonix::game::listen_to_events::listen_to_events;
+use xonix::game::listen_to_event::listen_to_event;
 use xonix::game::types::{CoordTile, Game, Tile};
 use xonix::player::manage_border_hit::manage_border_hit;
 use xonix::player::manage_player_movement::manage_player_movement;
@@ -16,10 +16,6 @@ use web_sys::CanvasRenderingContext2d;
 use lazy_static::lazy_static;
 use wasm_bindgen::prelude::*;
 
-#[wasm_bindgen]
-extern "C" {
-    fn alert(s: &str);
-}
 
 lazy_static! {
     static ref GAME: Mutex<Game> = Mutex::new(Game::new(CoordTile{ 
@@ -34,8 +30,8 @@ lazy_static! {
 }
 
 #[wasm_bindgen]
-pub fn event_listeners(event_code: &str) {
-    listen_to_events(event_code);
+pub fn event_listener(event_code: &str) {
+    listen_to_event(event_code);
 }
 
 #[wasm_bindgen]
@@ -67,6 +63,7 @@ pub fn render_game(ctx: &CanvasRenderingContext2d) {
         &mut enemies, 
         &mut tiles_map
     );
+
     if player.tail.len() > 0 {
         manage_border_hit(
             &mut player, 
@@ -74,6 +71,7 @@ pub fn render_game(ctx: &CanvasRenderingContext2d) {
             &game
         );
     }
+
     if *counter >= 2 {
         manage_player_movement(
             &mut player, 
@@ -84,7 +82,10 @@ pub fn render_game(ctx: &CanvasRenderingContext2d) {
     }
     *counter += 1;
 
-    draw(&mut tiles_map, ctx);
+    draw(
+        &mut tiles_map, 
+        ctx
+    );
 }
 
 
