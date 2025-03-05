@@ -1,7 +1,6 @@
 use crate::xonix::game::types::CoordTile;
 use super::types::{Enemy, EnemyDir};
 
-
 pub fn create_enemies(enemies: &mut Vec<Enemy>) {
     let pos = CoordTile { x: 6, y: 6, };
     let pos2 = CoordTile { x: 23, y: 27, };

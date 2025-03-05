@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use crate::xonix::game::types::{CoordTile, Occupied, Tile};
 use super::types::Enemy;
 
-
 pub fn move_enemies(
     enemies: &mut Vec<Enemy>,
     tiles_map: &mut HashMap<CoordTile, Tile>

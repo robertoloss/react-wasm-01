@@ -1,7 +1,6 @@
 use crate::CoordTile;
 use super::types::{Enemy, EnemyDir};
 
-
 pub fn tile_enemy_moves_to(enemy: &Enemy) -> CoordTile {
     let mut tile = CoordTile {
         x: enemy.pos_tile.x,

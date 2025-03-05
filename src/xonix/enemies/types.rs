@@ -2,7 +2,6 @@ use std::{collections::HashMap, convert::TryInto};
 use crate::{xonix::game::types::Role, CoordTile, Tile};
 use super::{movement::tile_enemy_moves_to, utils::check_if_tile_empty};
 
-
 #[derive(Clone)]
 pub enum EnemyDir {
     UpRight,
