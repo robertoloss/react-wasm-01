@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 use web_sys::CanvasRenderingContext2d;
+use crate::xonix::enemies::types_sphere::Sphere;
 use super::types::{CoordTile, Occupied, Role, Tile};
 
 
 pub fn draw(
     tiles_map: &mut HashMap<CoordTile, Tile>,
-    ctx: &CanvasRenderingContext2d
+    ctx: &CanvasRenderingContext2d,
+    spheres: &Vec<Sphere>
 ) {
     for (_, tile) in tiles_map.iter() {
         match tile.role {
@@ -26,4 +28,28 @@ pub fn draw(
             Tile::get_size()
         );
     };
+    
+    for sphere in spheres {
+        draw_sphere(
+            sphere, 
+            ctx
+        );
+    }
+}
+
+fn draw_sphere(
+    sphere: &Sphere,
+    ctx: &CanvasRenderingContext2d
+) {
+    ctx.begin_path();
+    ctx.arc(
+        sphere.position.x, 
+        sphere.position.y, 
+        sphere.radius, 
+        0.0, 
+        std::f64::consts::PI * 2.0
+    ).unwrap();
+    ctx.set_fill_style_str("red");
+    ctx.fill();
+    ctx.close_path();
 }

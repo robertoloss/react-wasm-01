@@ -1,4 +1,4 @@
-use std::fmt::{self, Display};
+use std::{fmt::{self, Display}, ops::{Add, AddAssign}};
 
 
 pub struct Game {
@@ -33,6 +33,25 @@ pub struct CoordAbs {
     pub x: f64,
     pub y: f64
 }
+
+impl Add for CoordAbs {
+    type Output = Self;
+    fn add(self, other: Self) -> Self {
+        Self {
+            x: self.x + other.x,
+            y: self.y + other.y,
+        }
+    }
+}
+impl AddAssign for CoordAbs {
+    fn add_assign(&mut self, other: Self) {
+        let _ = self.x + other.x;
+        let _ = self.y + other.y;
+    }
+}
+
+
+
 #[derive(Clone,Debug)]
 pub struct Tile {
     pub coord_tile: CoordTile,
