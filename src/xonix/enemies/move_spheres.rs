@@ -10,10 +10,8 @@ pub fn move_spheres(
     spheres
         .iter_mut()
         .for_each(|sphere| {
+            sphere.check_collision(tiles_map);
             sphere.moves();
-            if sphere.check_collision(tiles_map) {
-                sphere.moves();
-            }
             sphere.occupy_tile(tiles_map);
         });
 }

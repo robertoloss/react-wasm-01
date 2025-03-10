@@ -31,6 +31,7 @@ impl Sphere {
         ].to_vec();
         for dir in directions {
             if sphere_is_colliding(
+                self,
                 CoordAbs {
                     x: self.position.x + dir.0.0,
                     y: self.position.y + dir.0.1,
@@ -39,7 +40,6 @@ impl Sphere {
             ) {
                 self.velocity.x *= dir.1.0;
                 self.velocity.y *= dir.1.1;
-                //log_out(self.velocity.clone());
                 there_was_a_collision = true
             }
         }
@@ -70,13 +70,14 @@ impl Sphere {
 }
 
 fn sphere_is_colliding(
+    sphere: &Sphere,
     coord: CoordAbs,
     tiles_map: &HashMap<CoordTile, Tile>,
 )
     -> bool
 {
-    let new_x = (coord.x / Tile::get_size()) as u64 + 1;
-    let new_y = (coord.y / Tile::get_size()) as u64 + 1;
+    let new_x = (coord.x / Tile::get_size()) as u64;
+    let new_y = (coord.y / Tile::get_size()) as u64;
 
     let tile_size = Tile::get_size();
 

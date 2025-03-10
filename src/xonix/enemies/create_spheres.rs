@@ -16,7 +16,7 @@ pub fn create_spheres(
         })
         .expect("No tile found creating a sphere");
 
-    let velocity = 3.8;
+    let velocity = 4.2;
 
     let sphere = Sphere {
         position: CoordAbs {
@@ -27,6 +27,31 @@ pub fn create_spheres(
         velocity: CoordAbs {
             x: velocity,
             y: velocity,
+        },
+        current_tile: tile.clone(),
+        previous_tile: tile.clone(),
+    };
+    spheres.push(sphere);
+    let coord_x = 400.;
+    let coord_y = 200.;
+
+    let tile = tiles_map
+        .get(&CoordTile { 
+            x: (coord_x / Tile::get_size()) as u64,
+            y: (coord_y / Tile::get_size()) as u64,
+        })
+        .expect("No tile found creating a sphere");
+
+
+    let sphere = Sphere {
+        position: CoordAbs {
+            x: coord_x,
+            y: coord_y
+        },
+        radius: 8.,
+        velocity: CoordAbs {
+            x: 4.6,
+            y: -4.2,
         },
         current_tile: tile.clone(),
         previous_tile: tile.clone(),

@@ -15,7 +15,7 @@ use xonix::player::types::Player;
 use web_sys::CanvasRenderingContext2d;
 use lazy_static::lazy_static;
 use wasm_bindgen::prelude::*;
-use xonix::utils::{log_out, pause_game};
+use xonix::utils::log_out;
 
 
 lazy_static! {
