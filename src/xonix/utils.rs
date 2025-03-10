@@ -2,6 +2,8 @@ use std::fmt::Debug;
 use wasm_bindgen::JsValue;
 use web_sys::console;
 
+use crate::PAUSE;
+
 
 #[allow(dead_code)]
 pub fn log_out<T: Debug>(s: T) {
@@ -19,4 +21,10 @@ pub fn set_panic_hook() {
     // https://github.com/rustwasm/console_error_panic_hook#readme
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
+}
+
+pub fn pause_game(pause: &mut bool) {
+    if *pause {
+        return;
+    }
 }

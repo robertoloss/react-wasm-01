@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use web_sys::CanvasRenderingContext2d;
-use crate::xonix::enemies::types_sphere::Sphere;
+use crate::xonix::{enemies::types_sphere::Sphere, utils::log_out};
 use super::types::{CoordTile, Occupied, Role, Tile};
 
 
@@ -18,8 +18,8 @@ pub fn draw(
         match tile.occupied {
             Occupied::Player => { ctx.set_fill_style_str("blue") }
             Occupied::Tail => { ctx.set_fill_style_str("orange") }
-            Occupied::Enemy => { ctx.set_fill_style_str("red") }
-            Occupied::Empty => { }
+            Occupied::Enemy => {}
+            Occupied::Empty => {}
         }
         ctx.fill_rect(
             tile.coord_abs.x, 
@@ -28,7 +28,6 @@ pub fn draw(
             Tile::get_size()
         );
     };
-    
     for sphere in spheres {
         draw_sphere(
             sphere, 

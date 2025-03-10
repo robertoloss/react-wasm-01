@@ -5,7 +5,7 @@ use super::types_sphere::Sphere;
 
 pub fn move_spheres(
     spheres: &mut Vec<Sphere>,
-    tiles_map: &HashMap<CoordTile, Tile>,
+    tiles_map: &mut HashMap<CoordTile, Tile>,
 ) {
     spheres
         .iter_mut()
@@ -14,5 +14,6 @@ pub fn move_spheres(
             if sphere.check_collision(tiles_map) {
                 sphere.moves();
             }
+            sphere.occupy_tile(tiles_map);
         });
 }

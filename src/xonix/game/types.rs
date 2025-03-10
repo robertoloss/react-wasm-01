@@ -52,7 +52,7 @@ impl AddAssign for CoordAbs {
 
 
 
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,PartialEq)]
 pub struct Tile {
     pub coord_tile: CoordTile,
     pub coord_abs: CoordAbs,
@@ -61,6 +61,11 @@ pub struct Tile {
 }
 impl Tile {
    pub fn get_size() -> f64 { 8. } // 8. set tile width 
+}
+impl Display for Tile {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Tile ({:?}, {:?})", self.occupied, self.coord_tile)
+    }
 }
 
 #[derive(Debug,Clone,PartialEq)]
