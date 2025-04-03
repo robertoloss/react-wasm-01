@@ -1,21 +1,25 @@
+//use std::panic;
+mod enemies;
+mod game;
+mod player;
+mod utils;
 use std::panic;
-mod xonix;
 use std::{collections::HashMap, sync::Mutex};
-use xonix::enemies::create_spheres::create_spheres;
-use xonix::enemies::move_spheres::move_spheres;
-use xonix::enemies::types_sphere::Sphere;
-use xonix::game::create_tiles_map::create_tiles_map;
-use xonix::game::delta_wait::delta_wait;
-use xonix::game::draw::draw;
-use xonix::game::listen_to_event::listen_to_event;
-use xonix::game::types::{CoordTile, Game, Tile};
-use xonix::player::manage_border_hit::manage_border_hit;
-use xonix::player::manage_player_movement::manage_player_movement;
-use xonix::player::types::Player;
+use enemies::create_spheres::create_spheres;
+use enemies::move_spheres::move_spheres;
+use enemies::types_sphere::Sphere;
+use game::create_tiles_map::create_tiles_map;
+use game::delta_wait::delta_wait;
+use game::draw::draw;
+use game::listen_to_event::listen_to_event;
+use game::types::{CoordTile, Game, Tile};
+use player::manage_border_hit::manage_border_hit;
+use player::manage_player_movement::manage_player_movement;
+use player::types::Player;
 use web_sys::CanvasRenderingContext2d;
 use lazy_static::lazy_static;
 use wasm_bindgen::prelude::*;
-use xonix::utils::log_out;
+//use utils::utils::log_out;
 
 
 lazy_static! {

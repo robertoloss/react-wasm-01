@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use web_sys::CanvasRenderingContext2d;
-use crate::xonix::{enemies::types_sphere::Sphere, utils::log_out};
+use crate::enemies::types_sphere::Sphere;
 use super::types::{CoordTile, Occupied, Role, Tile};
 
 

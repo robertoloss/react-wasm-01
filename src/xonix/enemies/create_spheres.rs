@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use crate::xonix::game::types::{CoordAbs, CoordTile, Tile};
+use crate::game::types::{CoordAbs, CoordTile, Tile};
 use super::types_sphere::Sphere;
 
 pub fn create_spheres(

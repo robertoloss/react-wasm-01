@@ -1,4 +1,4 @@
-use crate::xonix::game::types::{CoordTile, Tile};
+use crate::game::types::{CoordTile, Tile};
 
 
 #[derive(PartialEq)]

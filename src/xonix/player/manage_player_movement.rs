@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use crate::xonix::game::types::{CoordTile, Game, Occupied, Role, Tile};
+use crate::game::types::{CoordTile, Game, Occupied, Role, Tile};
 use super::{move_player::move_player, types::{Move, Player}};
 
 

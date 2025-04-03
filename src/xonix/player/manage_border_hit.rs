@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use crate::xonix::game::{claim_tiles::claim_tiles, collect_tiles_to_claim::collect_tiles_to_claim, types::{CoordTile, Game, Role, Tile}};
+use crate::game::{claim_tiles::claim_tiles, collect_tiles_to_claim::collect_tiles_to_claim, types::{CoordTile, Game, Role, Tile}};
 use super::{erase_tail::erase_tail, types::{Move, Player}};
 
 

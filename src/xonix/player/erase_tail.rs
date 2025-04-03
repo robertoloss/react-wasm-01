@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use crate::xonix::game::types::{CoordTile, Occupied, Role, Tile};
+use crate::game::types::{CoordTile, Occupied, Role, Tile};
 use super::types::Player;
 
 

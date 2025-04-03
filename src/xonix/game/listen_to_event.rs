@@ -1,4 +1,4 @@
-use crate::{xonix::player::types::Move, PAUSE, PLAYER};
+use crate::{player::types::Move, PAUSE, PLAYER};
 
 pub fn listen_to_event(event_code: &str) {
     //console::log_1(&JsValue::from_str(event_code));
