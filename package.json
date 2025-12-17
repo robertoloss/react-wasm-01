@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"vite --port 5800\" \"cargo watch -s 'wasm-pack build --target web'\"",
+  "dev": "concurrently \"vite --port 5800\" \"cd rust/xonix && cargo watch -s 'wasm-pack build --target web --out-dir ../../pkg/xonix'\" \"cd rust/doom && cargo watch -s 'wasm-pack build --target web --out-dir ../../pkg/doom'\"",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -13,6 +13,7 @@
     "@tailwindcss/vite": "^4.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-router": "^7.4.1",
     "tailwindcss": "^4.0.0",
     "vite-plugin-top-level-await": "^1.4.4",
     "vite-plugin-wasm": "^3.4.1"

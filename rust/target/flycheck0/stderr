@@ -1,0 +1,7 @@
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   /Users/Roberto/Dropbox/CODING/Rust/react-wasm-01/rust/xonix/Cargo.toml
+workspace: /Users/Roberto/Dropbox/CODING/Rust/react-wasm-01/rust/Cargo.toml
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   /Users/Roberto/Dropbox/CODING/Rust/react-wasm-01/rust/doom/Cargo.toml
+workspace: /Users/Roberto/Dropbox/CODING/Rust/react-wasm-01/rust/Cargo.toml
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.02s
